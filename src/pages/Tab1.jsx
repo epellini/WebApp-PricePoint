@@ -61,18 +61,20 @@ const Tab1 = () => {
 
   const loadData = async () => {
     try {
-      let { data, error } = await supabase.from("products").select("*");
-
+      let query = supabase.from("products").select("*");
+  
+      if (searchTerm) {
+        query = query.ilike('product_name', `%${searchTerm}%`);
+      }
+  
+      let { data, error } = await query;
+  
       if (error) throw error;
-
-      const sortedData = data.sort((a, b) =>
-        a.product_name.localeCompare(b.product_name)
-      );
-
-      setItems(sortedData ?? []);
+  
+      // Sort and set items
+      setItems(data.sort((a, b) => a.product_name.localeCompare(b.product_name)) ?? []);
     } catch (error) {
       alert(error.message);
-      setItems([]);
     }
   };
 
@@ -109,14 +111,12 @@ const Tab1 = () => {
 
   const addItem = async (productName, productPrice) => {
     try {
-      let { error } = await supabase
-        .from("products")
-        .insert([
-          {
-            product_name: productName,
-            product_price: parseFloat(productPrice),
-          },
-        ]);
+      let { error } = await supabase.from("products").insert([
+        {
+          product_name: productName,
+          product_price: parseFloat(productPrice),
+        },
+      ]);
 
       if (error) throw error;
 
@@ -147,6 +147,45 @@ const Tab1 = () => {
       alert(error.message);
     }
   };
+
+  const calculatePriceStatusColorClass = (product) => {
+    const updateDate = product.product_updateDate;
+    const updateDateTime = new Date(updateDate).getTime();
+    const currentTime = new Date().getTime();
+    const diffDays = Math.floor(
+      (currentTime - updateDateTime) / (1000 * 3600 * 24)
+    );
+    let className;
+
+    if (diffDays <= 7) {
+      className = "green-badge";
+    } else if (diffDays <= 14) {
+      className = "yellow-badge";
+    } else if (diffDays <= 21) {
+      className = "orange-badge";
+    } else {
+      className = "red-badge";
+    }
+
+    console.log(`Product: ${product.product_name}, Status Class: ${className}`);
+    return className;
+  };
+
+// For Searchbar Debounce
+  const debounce = (func, wait) => {
+    let timeout;
+  
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+  
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+  
 
   return (
     <IonPage>
@@ -202,7 +241,10 @@ const Tab1 = () => {
                       </p>
                     </IonText>
                   </IonLabel>
-                  <IonBadge slot="end" color="success">
+                  <IonBadge
+                    slot="end"
+                    className={calculatePriceStatusColorClass(product)}
+                  >
                     $ {formatPrice(product.product_price)}
                   </IonBadge>
                 </IonItem>
