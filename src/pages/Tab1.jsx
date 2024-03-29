@@ -167,7 +167,7 @@ const Tab1 = () => {
       className = "red-badge";
     }
 
-    console.log(`Product: ${product.product_name}, Status Class: ${className}`);
+    // console.log(`Product: ${product.product_name}, Status Class: ${className}`);
     return className;
   };
 
@@ -191,10 +191,11 @@ const Tab1 = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Toolbar</IonTitle>
+          <IonTitle>Productos</IonTitle>
         </IonToolbar>
         <IonToolbar>
           <IonSearchbar
+            placeholder="Buscar producto"
             debounce={300}
             onIonInput={(e) => handleInput(e.detail.value)}
           ></IonSearchbar>
@@ -212,12 +213,6 @@ const Tab1 = () => {
             <IonIcon icon={add}></IonIcon>
           </IonFabButton>
         </IonFab>
-
-        <IonToast
-          trigger="open-toast"
-          message="This toast will disappear after 5 seconds"
-          duration={5000}
-        ></IonToast>
 
         <IonList inset={true}>
           {items
@@ -283,18 +278,18 @@ const Tab1 = () => {
         <IonAlert
           isOpen={showDeleteAlert}
           onDidDismiss={() => setShowDeleteAlert(false)}
-          header="Confirm Delete"
-          message="Are you sure you want to delete this item?"
+          header="Verificar eliminación"
+          message="¿Estás seguro de que deseas eliminar este producto?"
           buttons={[
             {
-              text: "Cancel",
+              text: "Cancelar",
               role: "cancel",
               handler: () => {
                 setShowDeleteAlert(false); // Optionally reset itemToDelete here if not done on dismissal
               },
             },
             {
-              text: "OK",
+              text: "Sí",
               handler: () => {
                 if (itemToDelete !== null) {
                   deleteItem(itemToDelete);
@@ -309,22 +304,22 @@ const Tab1 = () => {
         <IonAlert
           isOpen={showEditAlert}
           onDidDismiss={() => setShowEditAlert(false)}
-          header="Update Price"
+          header="Actualizar Precio"
           inputs={[
             {
               name: "productPrice",
               type: "number",
-              placeholder: "Price",
+              placeholder: "Precio",
             },
           ]}
           buttons={[
             {
-              text: "Cancel",
+              text: "Cancelar",
               role: "cancel",
               handler: () => setShowEditAlert(false),
             },
             {
-              text: "OK",
+              text: "Aceptar",
               handler: (alertData) => {
                 // Assuming the new price is provided, call the update function here
                 if (selectedItemId !== null) {
@@ -339,29 +334,29 @@ const Tab1 = () => {
         <IonAlert
           isOpen={showAddAlert}
           onDidDismiss={() => setShowAddAlert(false)}
-          header="Add Item"
+          header="Agregar producto"
           inputs={[
             {
               name: "productName", // Add a name property for identification
               type: "text",
-              placeholder: "Product Name",
+              placeholder: "Nombre del producto",
             },
             {
               name: "productPrice",
               type: "number",
-              placeholder: "Price",
+              placeholder: "Precio",
             },
           ]}
           buttons={[
             {
-              text: "Cancel",
+              text: "Descartar",
               role: "cancel",
               handler: () => {
                 console.log("Cancel clicked");
               },
             },
             {
-              text: "OK",
+              text: "Aceptar",
               handler: (alertData) => {
                 addItem(alertData.productName, alertData.productPrice);
               },
@@ -380,7 +375,7 @@ const Tab1 = () => {
           cssClass="custom-toast" // Apply the custom CSS class
           buttons={[
             {
-              text: "Dismiss",
+              text: "Descartar",
               role: "cancel",
               handler: () => {
                 console.log("Dismiss clicked");

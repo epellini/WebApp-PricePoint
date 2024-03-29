@@ -3,3 +3,26 @@
 .yellow-badge { background-color: #ffc107; }
 .orange-badge { background-color: #fd7e14; }
 .red-badge { background-color: #dc3545; }
+
+
+/* Custom styles for the toast */
+ion-toast.custom-toast {
+    --background: #f4f4fa; /* Light background color */
+    --box-shadow: 3px 3px 10px 0 rgba(0, 0, 0, 0.2); /* Subtle shadow for depth */
+    --color: #4b4a50; /* Default text color */
+  }
+  
+  /* Styling the message part of the toast */
+  ion-toast.custom-toast::part(message) {
+    color: green; /* Green color for the text */
+    font-size: 1.2rem; /* Larger text size */
+    text-align: center; /* Center-aligned text */
+  }
+  
+  /* Styling the button part of the toast */
+  ion-toast.custom-toast::part(button) {
+    border-left: 1px solid #d2d2d2; /* Separator between buttons */
+    color: #030207; /* Button text color */
+    font-size: 15px; /* Button text size */
+  }
+  
