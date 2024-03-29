@@ -52,6 +52,17 @@ const Tab1 = () => {
   const [totalPrice, setTotalPrice] = useState(0);
   const [showToast, setShowToast] = useState(false);
 
+  const [currentProductName, setCurrentProductName] = useState("");
+  const [currentProductPrice, setCurrentProductPrice] = useState("");
+  const [validationError, setValidationError] = useState("");
+
+  const [showValidationErrorToast, setShowValidationErrorToast] =
+    useState(false);
+  const [validationErrorMessage, setValidationErrorMessage] = useState("");
+
+  const [productNameError, setProductNameError] = useState("");
+  const [productPriceError, setProductPriceError] = useState("");
+
   const handleInput = (value) => {
     setSearchTerm(value.toLowerCase());
     console.log(value);
@@ -94,13 +105,14 @@ const Tab1 = () => {
     }).format(price);
   };
 
-  const updateProductPrice = async (itemId, newPrice) => {
+  const updateProductPrice = async (itemId, newPrice, newName) => {
     try {
       const { data, error } = await supabase
         .from("products")
         .update({
           product_price: parseFloat(newPrice),
           product_updateDate: new Date(),
+          product_name: newName,
         })
         .match({ id: itemId });
 
@@ -273,14 +285,21 @@ const Tab1 = () => {
                   <IonItemOption
                     color="warning"
                     onClick={() => {
-                      setSelectedItemId(product.id);
-                      setShowEditAlert(true);
+                      const productToEdit = items.find(
+                        (item) => item.id === product.id
+                      );
+                      if (productToEdit) {
+                        setCurrentProductName(productToEdit.product_name);
+                        setCurrentProductPrice(
+                          productToEdit.product_price.toString()
+                        );
+                        setSelectedItemId(product.id);
+                        setShowEditAlert(true);
+                      }
                     }}
-                    // onClick={() => { setSelectedItemId(item.id); setShowEditAlert(true);
                   >
                     <IonIcon slot="icon-only" icon={create}></IonIcon>
                   </IonItemOption>
-
                   {/* Add Item to Basket */}
                   <IonItemOption
                     color="tertiary"
@@ -326,9 +345,16 @@ const Tab1 = () => {
           header="Actualizar Precio"
           inputs={[
             {
+              name: "productName",
+              type: "text",
+              placeholder: "Nombre del producto",
+              value: currentProductName, // Ensures value is kept between edits
+            },
+            {
               name: "productPrice",
               type: "number",
               placeholder: "Precio",
+              value: currentProductPrice, // Ensures value is kept between edits
             },
           ]}
           buttons={[
