@@ -22,10 +22,12 @@ import {
   IonFabButton,
   IonToast,
   IonInput,
+  IonRefresher,
+  IonRefresherContent,
 } from "@ionic/react";
 import ExploreContainer from "../components/ExploreContainer";
 import "./Tab1.css";
-import { create, cart, trash, add } from "ionicons/icons";
+import { create, cart, trash, add, chevronDownCircleOutline  } from "ionicons/icons";
 
 import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(
@@ -62,17 +64,19 @@ const Tab1 = () => {
   const loadData = async () => {
     try {
       let query = supabase.from("products").select("*");
-  
+
       if (searchTerm) {
-        query = query.ilike('product_name', `%${searchTerm}%`);
+        query = query.ilike("product_name", `%${searchTerm}%`);
       }
-  
+
       let { data, error } = await query;
-  
+
       if (error) throw error;
-  
+
       // Sort and set items
-      setItems(data.sort((a, b) => a.product_name.localeCompare(b.product_name)) ?? []);
+      setItems(
+        data.sort((a, b) => a.product_name.localeCompare(b.product_name)) ?? []
+      );
     } catch (error) {
       alert(error.message);
     }
@@ -127,6 +131,13 @@ const Tab1 = () => {
     }
   };
 
+  function handleRefresh(event) {
+    setTimeout(() => {
+      // Any calls to load data go here
+      event.detail.complete();
+    }, 2000); // Increase this duration as needed
+  }
+
   const confirmDelete = (itemId) => {
     setItemToDelete(itemId); // Store the item ID to delete
     setShowDeleteAlert(true); // Show the delete confirmation alert
@@ -171,21 +182,20 @@ const Tab1 = () => {
     return className;
   };
 
-// For Searchbar Debounce
+  // For Searchbar Debounce
   const debounce = (func, wait) => {
     let timeout;
-  
+
     return function executedFunction(...args) {
       const later = () => {
         clearTimeout(timeout);
         func(...args);
       };
-  
+
       clearTimeout(timeout);
       timeout = setTimeout(later, wait);
     };
   };
-  
 
   return (
     <IonPage>
@@ -202,6 +212,15 @@ const Tab1 = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
+
+        {/* Refresher */}
+        <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
+          <IonRefresherContent
+            pullingIcon={chevronDownCircleOutline}
+            refreshingSpinner="circles"
+          ></IonRefresherContent>
+        </IonRefresher>
+
         <IonHeader collapse="condense">
           <IonToolbar>
             <IonTitle size="large">Productos</IonTitle>

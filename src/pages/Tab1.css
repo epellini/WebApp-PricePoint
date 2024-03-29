@@ -26,3 +26,7 @@ ion-toast.custom-toast {
     font-size: 15px; /* Button text size */
   }
   
+  /* Add this to your Tab1.css */
+ion-refresher-content {
+  z-index: 9999;
+}
