@@ -196,7 +196,7 @@ const Tab1 = () => {
         <IonToolbar>
           <IonSearchbar
             debounce={1000}
-            onIonChange={(e) => handleInput(e.detail.value)}
+            onIonInput={(e) => handleInput(e.detail.value)}
           ></IonSearchbar>
         </IonToolbar>
       </IonHeader>
