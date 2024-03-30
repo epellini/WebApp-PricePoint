@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   IonContent,
   IonHeader,
@@ -24,10 +24,24 @@ import {
   IonInput,
   IonRefresher,
   IonRefresherContent,
+  IonModal,
+  IonButtons,
+  IonAvatar,
+  IonImg,
+
+
 } from "@ionic/react";
 import ExploreContainer from "../components/ExploreContainer";
 import "./Tab1.css";
-import { create, cart, trash, add, chevronDownCircleOutline  } from "ionicons/icons";
+import {
+  create,
+  cart,
+  trash,
+  add,
+  chevronDownCircleOutline,
+  personCircle,
+  pricetag,
+} from "ionicons/icons";
 
 import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(
@@ -41,7 +55,8 @@ const Tab1 = () => {
   const [inputPrice, setInputPrice] = useState("");
   const [items, setItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddAlert, setShowAddAlert] = useState(false);
+  const [showAddProductAlert, setShowAddProductAlert] = useState(false);
+  const [showAddPersonAlert, setShowAddPersonAlert] = useState(false);
   const [tempInputName, setTempInputName] = useState("");
   const [tempInputPrice, setTempInputPrice] = useState("");
   const [showEditAlert, setShowEditAlert] = useState(false);
@@ -54,6 +69,9 @@ const Tab1 = () => {
 
   const [currentProductName, setCurrentProductName] = useState("");
   const [currentProductPrice, setCurrentProductPrice] = useState("");
+
+  const [personName, setPersonName] = useState("");
+
   const [validationError, setValidationError] = useState("");
 
   const [showValidationErrorToast, setShowValidationErrorToast] =
@@ -62,6 +80,8 @@ const Tab1 = () => {
 
   const [productNameError, setProductNameError] = useState("");
   const [productPriceError, setProductPriceError] = useState("");
+
+  const modal = useRef(null);
 
   const handleInput = (value) => {
     setSearchTerm(value.toLowerCase());
@@ -143,6 +163,23 @@ const Tab1 = () => {
     }
   };
 
+  const addPerson = async (personName) => {
+    try {
+      let { error } = await supabase.from("people").insert([
+        {
+          person_name: personName,
+        },
+      ]);
+
+      if (error) throw error;
+
+      // Reload items after adding
+      loadData(); // Assumes loadData is defined as before to fetch items
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
   function handleRefresh(event) {
     setTimeout(() => {
       // Any calls to load data go here
@@ -209,6 +246,11 @@ const Tab1 = () => {
     };
   };
 
+  const openModal = () => {
+    modal.current?.present();
+  };
+
+
   return (
     <IonPage>
       <IonHeader>
@@ -224,7 +266,6 @@ const Tab1 = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
-
         {/* Refresher */}
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent
@@ -240,9 +281,18 @@ const Tab1 = () => {
         </IonHeader>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end">
-          <IonFabButton onClick={() => setShowAddAlert(true)}>
+          <IonFabButton>
             <IonIcon icon={add}></IonIcon>
           </IonFabButton>
+
+          <IonFabList side="top">
+            <IonFabButton onClick={() => setShowAddProductAlert(true)} color={"dark"}>
+              <IonIcon icon={pricetag}></IonIcon>
+            </IonFabButton>
+            <IonFabButton onClick={()=> setShowAddPersonAlert(true)} color={"dark"}>
+              <IonIcon icon={personCircle}></IonIcon>
+            </IonFabButton>
+          </IonFabList>
         </IonFab>
 
         <IonList inset={true}>
@@ -377,8 +427,8 @@ const Tab1 = () => {
 
         {/* Alert to add new Item */}
         <IonAlert
-          isOpen={showAddAlert}
-          onDidDismiss={() => setShowAddAlert(false)}
+          isOpen={showAddProductAlert}
+          onDidDismiss={() => setShowAddProductAlert(false)}
           header="Agregar producto"
           inputs={[
             {
@@ -409,6 +459,41 @@ const Tab1 = () => {
           ]}
         />
 
+        {/* Alert to add new Person */}
+        <IonAlert
+          isOpen={showAddPersonAlert}
+          onDidDismiss={() => setShowAddPersonAlert(false)}
+          header="Agregar persona"
+          inputs={[
+            {
+              name: "personName", // Add a name property for identification
+              type: "text",
+              placeholder: "Nombre de la persona",
+            },
+          ]}
+          buttons={[
+            {
+              text: "Descartar",
+              role: "cancel",
+              handler: () => {
+                console.log("Cancel clicked");
+              },
+            },
+            {
+              text: "Aceptar",
+              handler: (alertData) => {
+                addPerson(alertData.personName);
+              },
+            },
+          ]}
+        />
+
+
+
+
+
+
+
         <IonToast
           isOpen={showToast}
           onDidDismiss={() => {
@@ -426,8 +511,48 @@ const Tab1 = () => {
                 console.log("Dismiss clicked");
               },
             },
+            {
+              text: "Pagar",
+              role: "pay",
+              handler: () => {
+                openModal();
+                console.log("Pay clicked");
+              },
+            },
           ]}
         />
+
+        {/* Modal that brings up the customers */}
+
+        <IonModal ref={modal} keepContentsMounted={true}  initialBreakpoint={0.5} breakpoints={[0, 0.25, 0.5, 0.75]} >
+          <IonHeader>
+            <IonToolbar>
+              <IonButtons slot="start">
+                <IonButton onClick={() => modal.current?.dismiss()}>
+                  Close
+                </IonButton>
+              </IonButtons>
+              <IonTitle>Modal</IonTitle>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+          <IonSearchbar onClick={() => modal.current?.setCurrentBreakpoint(0.75)} placeholder="Search"></IonSearchbar>
+          <IonList>
+              <IonItem>
+              <IonAvatar aria-hidden="true" slot="start">
+                <img alt="" src="https://ionicframework.com/docs/img/demos/avatar.svg" />
+              </IonAvatar>
+                <IonLabel>
+                  <h2>Connor Smith</h2>
+                  <p>Sales Rep</p>
+                </IonLabel>
+              </IonItem>
+              </IonList>
+
+
+
+          </IonContent>
+        </IonModal>
       </IonContent>
     </IonPage>
   );
