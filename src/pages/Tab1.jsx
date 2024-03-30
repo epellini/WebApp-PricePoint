@@ -28,8 +28,6 @@ import {
   IonButtons,
   IonAvatar,
   IonImg,
-
-
 } from "@ionic/react";
 import ExploreContainer from "../components/ExploreContainer";
 import "./Tab1.css";
@@ -70,7 +68,7 @@ const Tab1 = () => {
   const [currentProductName, setCurrentProductName] = useState("");
   const [currentProductPrice, setCurrentProductPrice] = useState("");
 
-  const [personName, setPersonName] = useState("");
+  const [customerName, setCustomerName] = useState("");
 
   const [validationError, setValidationError] = useState("");
 
@@ -80,6 +78,33 @@ const Tab1 = () => {
 
   const [productNameError, setProductNameError] = useState("");
   const [productPriceError, setProductPriceError] = useState("");
+
+  const [customers, setCustomers] = useState([]);
+  const [searchCustomerTerm, setSearchCustomerTerm] = useState("");
+
+  const [tempTotalPrice, setTempTotalPrice] = useState(0);
+
+  // function to get customer list that will show up in modal when pay button is clicked
+  const loadCustomers = async (searchCustomerTerm = "") => {
+    try {
+      let query = supabase.from("customers").select("*");
+      if (searchCustomerTerm) {
+        query = query.ilike("customer_name", `%${searchCustomerTerm}%`);
+      }
+      let { data, error } = await query;
+      if (error) throw error;
+      setCustomers(
+        data.sort((a, b) => a.customer_name.localeCompare(b.customer_name)) ??
+          []
+      );
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const handleCustomerSearch = (value) => {
+    setSearchCustomerTerm(value.toLowerCase());
+  };
 
   const modal = useRef(null);
 
@@ -91,6 +116,10 @@ const Tab1 = () => {
   useEffect(() => {
     loadData();
   }, [searchTerm]);
+
+  useEffect(() => {
+    loadCustomers(searchCustomerTerm); // This fetches customers based on searchCustomerTerm
+  }, [searchCustomerTerm]); // Re-fetches whenever searchCustomerTerm changes
 
   const loadData = async () => {
     try {
@@ -163,11 +192,12 @@ const Tab1 = () => {
     }
   };
 
-  const addPerson = async (personName) => {
+  const addPerson = async (customerName) => {
     try {
-      let { error } = await supabase.from("people").insert([
+      let { error } = await supabase.from("customers").insert([
         {
-          person_name: personName,
+          customer_name: customerName,
+          customer_updatedate: new Date(),
         },
       ]);
 
@@ -250,6 +280,65 @@ const Tab1 = () => {
     modal.current?.present();
   };
 
+  const handlePayClick = () => {
+    // Store the current total price temporarily before opening the modal
+    setTempTotalPrice(totalPrice);
+    openModal();
+  };
+
+  const handleCustomerSelect = async (customerId, tempTotalPrice) => {
+    console.log(
+      `Attempting to update customer ${customerId} with amount ${tempTotalPrice}`
+    );
+    try {
+      // Ensure tempTotalPrice is a number
+      tempTotalPrice = parseFloat(tempTotalPrice);
+      if (isNaN(tempTotalPrice)) {
+        console.error("tempTotalPrice is not a valid number");
+        return;
+      }
+
+      // Fetch the current total debt of the selected customer
+      let { data: currentDebtData, error: fetchError } = await supabase
+        .from("customers")
+        .select("customer_totaldebt")
+        .eq("id", customerId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      console.log(`Current debt data:`, currentDebtData);
+
+      // Calculate the new total debt
+      const currentDebt = currentDebtData.customer_totaldebt || 0;
+      const newTotalDebt = currentDebt + tempTotalPrice;
+      console.log(`New total debt: ${newTotalDebt}`);
+
+      // Update the customer's total debt with the new amount
+      const { data: updateData, error: updateError } = await supabase
+        .from("customers")
+        .update({ customer_totaldebt: newTotalDebt })
+        .eq("id", customerId);
+
+      if (updateError) throw updateError;
+      console.log("Update response:", updateData); // This should not be null if a row was updated
+
+      if (updateData) {
+        console.log("Customer debt updated successfully");
+        // Reset tempTotalPrice after successful update
+        setTempTotalPrice(0);
+      } else {
+        console.log(
+          "No rows updated. Check if the customer ID exists and matches."
+        );
+      }
+
+      modal.current?.dismiss();
+      setTotalPrice(0); // Reset total price after successful update
+    } catch (error) {
+      console.error("Failed to update customer debt:", error);
+      alert(error.message);
+    }
+  };
 
   return (
     <IonPage>
@@ -286,10 +375,16 @@ const Tab1 = () => {
           </IonFabButton>
 
           <IonFabList side="top">
-            <IonFabButton onClick={() => setShowAddProductAlert(true)} color={"dark"}>
+            <IonFabButton
+              onClick={() => setShowAddProductAlert(true)}
+              color={"dark"}
+            >
               <IonIcon icon={pricetag}></IonIcon>
             </IonFabButton>
-            <IonFabButton onClick={()=> setShowAddPersonAlert(true)} color={"dark"}>
+            <IonFabButton
+              onClick={() => setShowAddPersonAlert(true)}
+              color={"dark"}
+            >
               <IonIcon icon={personCircle}></IonIcon>
             </IonFabButton>
           </IonFabList>
@@ -466,7 +561,7 @@ const Tab1 = () => {
           header="Agregar persona"
           inputs={[
             {
-              name: "personName", // Add a name property for identification
+              name: "customerName", // Add a name property for identification
               type: "text",
               placeholder: "Nombre de la persona",
             },
@@ -482,17 +577,11 @@ const Tab1 = () => {
             {
               text: "Aceptar",
               handler: (alertData) => {
-                addPerson(alertData.personName);
+                addPerson(alertData.customerName);
               },
             },
           ]}
         />
-
-
-
-
-
-
 
         <IonToast
           isOpen={showToast}
@@ -515,7 +604,7 @@ const Tab1 = () => {
               text: "Pagar",
               role: "pay",
               handler: () => {
-                openModal();
+                handlePayClick();
                 console.log("Pay clicked");
               },
             },
@@ -524,7 +613,12 @@ const Tab1 = () => {
 
         {/* Modal that brings up the customers */}
 
-        <IonModal ref={modal} keepContentsMounted={true}  initialBreakpoint={0.5} breakpoints={[0, 0.25, 0.5, 0.75]} >
+        <IonModal
+          ref={modal}
+          keepContentsMounted={true}
+          initialBreakpoint={0.5}
+          breakpoints={[0, 0.25, 0.5, 0.75]}
+        >
           <IonHeader>
             <IonToolbar>
               <IonButtons slot="start">
@@ -532,25 +626,41 @@ const Tab1 = () => {
                   Close
                 </IonButton>
               </IonButtons>
-              <IonTitle>Modal</IonTitle>
+              <IonTitle>Select Customer</IonTitle>
             </IonToolbar>
           </IonHeader>
           <IonContent className="ion-padding">
-          <IonSearchbar onClick={() => modal.current?.setCurrentBreakpoint(0.75)} placeholder="Search"></IonSearchbar>
-          <IonList>
-              <IonItem>
-              <IonAvatar aria-hidden="true" slot="start">
-                <img alt="" src="https://ionicframework.com/docs/img/demos/avatar.svg" />
-              </IonAvatar>
-                <IonLabel>
-                  <h2>Connor Smith</h2>
-                  <p>Sales Rep</p>
-                </IonLabel>
-              </IonItem>
-              </IonList>
+            <IonSearchbar
+              debounce={300}
+              value={searchCustomerTerm}
+              onClick={() => modal.current?.setCurrentBreakpoint(0.75)}
+              onIonInput={(e) => handleCustomerSearch(e.detail.value)}
+              onIonChange={(e) => setSearchCustomerTerm(e.detail.value)}
+              placeholder="Search"
+            ></IonSearchbar>
 
-
-
+            <IonList>
+              {customers.map((customer) => (
+                <IonItem
+                  key={customer.id}
+                  button
+                  onClick={() =>
+                    handleCustomerSelect(customer.id, tempTotalPrice)
+                  }
+                >
+                  <IonAvatar slot="start">
+                    <img
+                      alt={customer.customer_name}
+                      src="https://ionicframework.com/docs/img/demos/avatar.svg"
+                    />
+                  </IonAvatar>
+                  <IonLabel>
+                    <h2>{customer.customer_name}</h2>
+                    {/* Add other customer details here as needed */}
+                  </IonLabel>
+                </IonItem>
+              ))}
+            </IonList>
           </IonContent>
         </IonModal>
       </IonContent>
