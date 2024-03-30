@@ -84,6 +84,17 @@ const Tab1 = () => {
 
   const [tempTotalPrice, setTempTotalPrice] = useState(0);
 
+  const [showPayConfirmToast, setShowPayConfirmToast] = useState(false);
+
+  const notificationSound = new Audio("/paymentConfirmation.mp3");
+
+  // Function to play the notification sound
+  const playNotificationSound = () => {
+    notificationSound
+      .play()
+      .catch((error) => console.error("Error playing the sound:", error));
+  };
+
   // function to get customer list that will show up in modal when pay button is clicked
   const loadCustomers = async (searchCustomerTerm = "") => {
     try {
@@ -319,8 +330,13 @@ const Tab1 = () => {
       // Update the customer's total debt with the new amount
       const { data: updateData, error: updateError } = await supabase
         .from("customers")
-        .update({ customer_totaldebt: newTotalDebt, customer_updatedate: new Date()})
+        .update({
+          customer_totaldebt: newTotalDebt,
+          customer_updatedate: new Date(),
+        })
         .eq("id", customerId);
+      setShowPayConfirmToast(true); // Show the payment confirmation toast
+      playNotificationSound();
 
       if (updateError) throw updateError;
       console.log("Update response:", updateData); // This should not be null if a row was updated
@@ -612,6 +628,16 @@ const Tab1 = () => {
               },
             },
           ]}
+        />
+
+        {/* Toast for successful payment */}
+        <IonToast
+          isOpen={showPayConfirmToast}
+          onDidDismiss={() => setShowPayConfirmToast(false)}
+          message="Transacción Registrada!"
+          position="top"
+          duration={2000} // Toast will dismiss after 2000ms
+          cssClass="payment-confirmation-toast"
         />
 
         {/* Modal that brings up the customers */}

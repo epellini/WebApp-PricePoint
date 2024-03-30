@@ -30,3 +30,16 @@ ion-toast.custom-toast {
 ion-refresher-content {
   z-index: 9999;
 }
+
+
+/* Custom styles for the payment confirmation toast */
+.payment-confirmation-toast {
+  --background: #28a745; /* Green background color */
+  --color: #ffffff; /* White text color */
+}
+
+/* Styling the message part of the payment confirmation toast */
+.payment-confirmation-toast::part(message) {
+  font-size: 1.2rem; /* Larger text size */
+  text-align: center; /* Center-aligned text */
+}
