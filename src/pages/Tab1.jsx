@@ -198,13 +198,16 @@ const Tab1 = () => {
         {
           customer_name: customerName,
           customer_updatedate: new Date(),
+          customer_totaldebt: 0,
+          customer_doesowe: false,
         },
       ]);
 
       if (error) throw error;
 
       // Reload items after adding
-      loadData(); // Assumes loadData is defined as before to fetch items
+      // loadData(); Not needed since we're only adding customers
+      loadCustomers(); // Assumes loadData is defined as before to fetch items
     } catch (error) {
       alert(error.message);
     }
@@ -316,7 +319,7 @@ const Tab1 = () => {
       // Update the customer's total debt with the new amount
       const { data: updateData, error: updateError } = await supabase
         .from("customers")
-        .update({ customer_totaldebt: newTotalDebt })
+        .update({ customer_totaldebt: newTotalDebt, customer_updatedate: new Date()})
         .eq("id", customerId);
 
       if (updateError) throw updateError;
