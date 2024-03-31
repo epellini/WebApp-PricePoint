@@ -30,7 +30,7 @@ import {
   IonImg,
 } from "@ionic/react";
 import ExploreContainer from "../components/ExploreContainer";
-import "./Tab1.css";
+import "./StyleProducts.css";
 import {
   create,
   cart,
@@ -47,7 +47,7 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
-const Tab1 = () => {
+const Products = () => {
   const [editItem, setEditItem] = useState();
   const [inputName, setInputName] = useState("");
   const [inputPrice, setInputPrice] = useState("");
@@ -667,7 +667,6 @@ const Tab1 = () => {
               onIonChange={(e) => setSearchCustomerTerm(e.detail.value)}
               placeholder="Search"
             ></IonSearchbar>
-
             <IonList>
               {customers.map((customer) => (
                 <IonItem
@@ -697,4 +696,4 @@ const Tab1 = () => {
   );
 };
 
-export default Tab1;
+export default Products;
