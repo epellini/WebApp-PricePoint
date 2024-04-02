@@ -1,47 +1,25 @@
+import React, { useEffect, useState } from "react";
 import {
   IonContent,
   IonHeader,
   IonPage,
   IonTitle,
   IonToolbar,
-  IonSearchbar,
   IonList,
   IonItem,
-  IonIcon,
-  IonItemOptions,
-  IonItemOption,
-  IonItemSliding,
   IonLabel,
-  IonBadge,
-  IonText,
-  IonAlert,
-  IonButton,
-  IonFab,
-  IonFabList,
-  IonFabButton,
-  IonToast,
-  IonInput,
-  IonRefresher,
-  IonRefresherContent,
-  IonModal,
-  IonButtons,
   IonAvatar,
   IonImg,
-  IonNav,
-  IonNavLink,
+  IonModal,
+  IonButton,
+  IonIcon,
+  IonButtons,
+  IonText,
+  IonSearchbar,
 } from "@ionic/react";
-import {
-  create,
-  cart,
-  trash,
-  add,
-  chevronDownCircleOutline,
-  personCircle,
-  pricetag,
-} from "ionicons/icons";
-import ExploreContainer from "../components/ExploreContainer";
+import { closeCircle } from "ionicons/icons";
+
 import "./StyleCustomers.css";
-import React, { useEffect, useState, useRef } from "react";
 
 import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(
@@ -49,53 +27,87 @@ const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 );
 
-import CustomerDetails from "./CustomerDetails";
-
 const Customers = () => {
-  const [editItem, setEditItem] = useState();
-  const [inputName, setInputName] = useState("");
-  const [inputPrice, setInputPrice] = useState("");
-  const [items, setItems] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [showAddProductAlert, setShowAddProductAlert] = useState(false);
-  const [showAddPersonAlert, setShowAddPersonAlert] = useState(false);
-  const [tempInputName, setTempInputName] = useState("");
-  const [tempInputPrice, setTempInputPrice] = useState("");
-  const [showEditAlert, setShowEditAlert] = useState(false);
-  const [selectedItemId, setSelectedItemId] = useState(null);
-
-  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [showToast, setShowToast] = useState(false);
-
-  const [currentProductName, setCurrentProductName] = useState("");
-  const [currentProductPrice, setCurrentProductPrice] = useState("");
-
-  const [customerName, setCustomerName] = useState("");
-
-  const [validationError, setValidationError] = useState("");
-
-  const [showValidationErrorToast, setShowValidationErrorToast] =
-    useState(false);
-  const [validationErrorMessage, setValidationErrorMessage] = useState("");
-
-  const [productNameError, setProductNameError] = useState("");
-  const [productPriceError, setProductPriceError] = useState("");
-
   const [customers, setCustomers] = useState([]);
-  const [searchCustomerTerm, setSearchCustomerTerm] = useState("");
+  const [customerDetails, setCustomerDetails] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [receipts, setReceipts] = useState([]);
 
-  const [tempTotalPrice, setTempTotalPrice] = useState(0);
+  useEffect(() => {
+    const loadCustomers = async () => {
+      let { data, error } = await supabase.from("customers").select("*");
+      if (error) throw error;
+      setCustomers(data ?? []);
+    };
 
-  const [showPayConfirmToast, setShowPayConfirmToast] = useState(false);
+    loadCustomers();
+  }, []);
 
-  const notificationSound = new Audio("/paymentConfirmation.mp3");
+  const fetchCustomerDetails = async (id) => {
+    let { data: customerData, error: customerError } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("id", id)
+      .single();
 
-  const handleCustomerSearch = (value) => {
-    setSearchCustomerTerm(value.toLowerCase());
+    if (customerError) {
+      console.error("Error fetching customer details:", customerError);
+      return;
+    }
+
+    setCustomerDetails(customerData);
+    await loadReceipts(id); // Load receipts after setting customer details
+    setShowModal(true);
   };
 
+  const loadReceipts = async (customerId) => {
+    try {
+      let { data, error } = await supabase
+        .from("receipts")
+        .select("*")
+        .eq("customer_id", customerId);
+      if (error) throw error;
+      setReceipts(data ?? []);
+    } catch (error) {
+      console.error("Error loading receipts:", error);
+    }
+  };
+
+  const updateCustomerDebt = async (customerId, amount) => {
+    // Assuming you have a column `total_debt` in your `customers` table
+    let { data, error } = await supabase
+      .from("customers")
+      .update({
+        total_debt: supabase.rpc("add_to_debt", { amount_to_add: amount }),
+      }) // Example: Use a stored procedure or direct operation
+      .eq("id", customerId);
+
+    if (error) {
+      console.error("Error updating customer debt:", error);
+      return;
+    }
+
+    alert(`Debt updated. New total: ${data[0].total_debt}`);
+    setShowModal(false); // Optionally close the modal after update
+  };
+
+  const markDebtAsPaid = async (customerId) => {
+    let { data, error } = await supabase
+      .from("receipts")
+      .update({ receipt_currentAmount: 0, receipt_ispaid: true }) // Ensure column names match your schema
+      .eq("customer_id", customerId); // Correctly target receipts by customer ID
+  
+    if (error) {
+      console.error("Error marking debt as paid:", error);
+      return;
+    }
+  
+    alert("All debts for the customer marked as paid.");
+    // setShowModal(false); // Optionally close the modal after update
+  };
+  
+
+  //  This function is for searching customers in the database. It will be called when the user types in the search bar.
   const loadCustomers = async (searchCustomerTerm = "") => {
     try {
       let query = supabase.from("customers").select("*");
@@ -113,10 +125,6 @@ const Customers = () => {
     }
   };
 
-  useEffect(() => {
-    loadCustomers(searchCustomerTerm); // This fetches customers based on searchCustomerTerm
-  }, [searchCustomerTerm]); // Re-fetches whenever searchCustomerTerm changes
-
   return (
     <IonPage>
       <IonHeader>
@@ -133,9 +141,16 @@ const Customers = () => {
 
         <IonList>
           {customers.map((customer) => (
-            <IonItem key={customer.id} routerLink={`/Customers/${customer.id}`} detail={false}>
+            <IonItem
+              key={customer.id}
+              button
+              onClick={() => fetchCustomerDetails(customer.id)}
+            >
               <IonAvatar slot="start">
-                <IonImg src="https://ionicframework.com/docs/img/demos/avatar.svg" alt="Customer" />
+                <IonImg
+                  src="https://ionicframework.com/docs/img/demos/avatar.svg"
+                  alt="Customer"
+                />
               </IonAvatar>
               <IonLabel>
                 <h2>{customer.customer_name}</h2>
@@ -143,6 +158,64 @@ const Customers = () => {
             </IonItem>
           ))}
         </IonList>
+
+        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
+          <IonHeader>
+            <IonToolbar>
+              <IonTitle>{customerDetails?.customer_name}</IonTitle>
+              <IonButtons slot="end">
+                <IonButton onClick={() => setShowModal(false)}>
+                  <IonIcon icon={closeCircle} />
+                </IonButton>
+              </IonButtons>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent class="ion-padding">
+            <h2>Customer Details</h2>
+            <p>Name: {customerDetails?.customer_name}</p>
+
+            <h2>Receipts:</h2>
+            <IonList>
+              {receipts.map((receipt, index) => (
+                <IonItem key={index}>
+                  <IonLabel>
+                    <p>{`Receipt ${index + 1}`}</p>
+                  </IonLabel>
+                  <IonText
+                    color="medium"
+                    style={{ display: "block", fontSize: "smaller" }}
+                  >
+                    <p>
+                      Date:{" "}
+                      {new Date(receipt.receipt_createddate).toLocaleDateString(
+                        "es-ES",
+                        {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        }
+                      )}
+                    </p>
+                    <IonText>Amount: {receipt.receipt_amount}</IonText>
+                  </IonText>
+                  <IonButton
+                    onClick={() =>
+                      updateCustomerDebt(
+                        customerDetails.id,
+                        receipt.receipt_amount
+                      )
+                    }
+                  >
+                    Update Debt
+                  </IonButton>
+                  <IonButton onClick={() => markDebtAsPaid(customerDetails.id)}>
+                    Mark as Paid
+                  </IonButton>
+                </IonItem>
+              ))}
+            </IonList>
+          </IonContent>
+        </IonModal>
       </IonContent>
     </IonPage>
   );

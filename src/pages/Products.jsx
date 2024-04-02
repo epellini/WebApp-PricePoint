@@ -338,6 +338,24 @@ const Products = () => {
       setShowPayConfirmToast(true); // Show the payment confirmation toast
       playNotificationSound();
 
+      // Add the total and the customer ID to as a new record in the receipts table
+      const { data: receiptData, error: receiptError } = await supabase
+        .from("receipts")
+        .insert([ // Insert the new receipt record
+          {
+            customer_id: customerId,
+            receipt_amount: tempTotalPrice,
+            receipt_currentAmount: tempTotalPrice,
+            receipt_createddate: new Date(),
+            receipt_ispaid: false,
+          },
+        ]); // This will add a new record to the receipts table
+
+      if (receiptError) throw receiptError;
+      console.log("Receipt data:", receiptData); // This should not be null if a row was inserted
+
+      
+
       if (updateError) throw updateError;
       console.log("Update response:", updateData); // This should not be null if a row was updated
 

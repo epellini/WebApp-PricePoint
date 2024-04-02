@@ -44,7 +44,7 @@ const App: React.FC = () => (
           <Route path="/Products" component={Products} />
 
           <Route path="/Customers" component={Customers} />
-          <Route path="/Customers/:id" component={CustomerDetails} />
+          {/* <Route path="/Customers/:id" component={CustomerDetails} /> */}
 
           <Route exact path="/" render={() => <Redirect to="/Products" />} />
 
