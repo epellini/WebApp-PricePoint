@@ -14,6 +14,7 @@ import { cashOutline, receiptOutline } from "ionicons/icons";
 
 import Products from "./pages/Products";
 import Customers from "./pages/Customers";
+import CustomerDetails from "./pages/CustomerDetails";
 import Tab3 from "./pages/Tab3";
 
 /* Core CSS required for Ionic components to work properly */
@@ -40,32 +41,24 @@ const App: React.FC = () => (
     <IonReactRouter>
       <IonTabs>
         <IonRouterOutlet>
-          <Route exact path="/Products">
-            <Products />
-          </Route>
-          <Route exact path="/Customers">
-            <Customers />
-          </Route>
-          <Route exact path="/">
-            <Redirect to="/Products" />
-          </Route>
-          {/* <Route path="/tab3">
-            <Tab3 />
-          </Route> */}
+          <Route path="/Products" component={Products} />
+
+          <Route path="/Customers" component={Customers} />
+          <Route path="/Customers/:id" component={CustomerDetails} />
+
+          <Route exact path="/" render={() => <Redirect to="/Products" />} />
+
+          <Route render={() => <Redirect to={"/Products"} />} />
         </IonRouterOutlet>
+
         <IonTabBar slot="bottom">
           <IonTabButton tab="products" href="/Products">
             <IonIcon aria-hidden="true" icon={cashOutline} />
-            {/* <IonLabel></IonLabel> */}
           </IonTabButton>
+
           <IonTabButton tab="Customers" href="/Customers">
             <IonIcon aria-hidden="true" icon={receiptOutline} />
-            {/* <IonLabel>Tab 2</IonLabel> */}
           </IonTabButton>
-          {/* <IonTabButton tab="tab3" href="/tab3">
-            <IonIcon aria-hidden="true" icon={square} />
-            <IonLabel>Tab 3</IonLabel>
-          </IonTabButton> */}
         </IonTabBar>
       </IonTabs>
     </IonReactRouter>

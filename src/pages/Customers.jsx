@@ -51,7 +51,7 @@ const supabase = createClient(
 
 import CustomerDetails from "./CustomerDetails";
 
-const Tab2 = () => {
+const Customers = () => {
   const [editItem, setEditItem] = useState();
   const [inputName, setInputName] = useState("");
   const [inputPrice, setInputPrice] = useState("");
@@ -133,29 +133,14 @@ const Tab2 = () => {
 
         <IonList>
           {customers.map((customer) => (
-            <IonNavLink
-              routerDirection="forward"
-              component={() => <CustomerDetails />}
-            >
-              <IonItem
-                key={customer.id}
-                button
-                onClick={() =>
-                  handleCustomerSelect(customer.id, tempTotalPrice)
-                }
-              >
-                <IonAvatar slot="start">
-                  <img
-                    alt={customer.customer_name}
-                    src="https://ionicframework.com/docs/img/demos/avatar.svg"
-                  />
-                </IonAvatar>
-                <IonLabel>
-                  <h2>{customer.customer_name}</h2>
-                  {/* Add other customer details here as needed */}
-                </IonLabel>
-              </IonItem>
-            </IonNavLink>
+            <IonItem key={customer.id} routerLink={`/Customers/${customer.id}`} detail={false}>
+              <IonAvatar slot="start">
+                <IonImg src="https://ionicframework.com/docs/img/demos/avatar.svg" alt="Customer" />
+              </IonAvatar>
+              <IonLabel>
+                <h2>{customer.customer_name}</h2>
+              </IonLabel>
+            </IonItem>
           ))}
         </IonList>
       </IonContent>
@@ -163,4 +148,4 @@ const Tab2 = () => {
   );
 };
 
-export default Tab2;
+export default Customers;
