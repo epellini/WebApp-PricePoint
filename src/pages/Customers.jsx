@@ -15,7 +15,12 @@ import {
   IonIcon,
   IonButtons,
   IonText,
+  IonAlert,
   IonSearchbar,
+  IonInput,
+  IonAccordion,
+  IonAccordionGroup,
+  IonBadge,
 } from "@ionic/react";
 import { closeCircle } from "ionicons/icons";
 
@@ -32,6 +37,10 @@ const Customers = () => {
   const [customerDetails, setCustomerDetails] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [receipts, setReceipts] = useState([]);
+
+  const [showEditDebtAlert, setShowEditDebtAlert] = useState(false);
+  const [newDebtAmount, setNewDebtAmount] = useState(0);
+  const [activeReceiptId, setActiveReceiptId] = useState(null);
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -73,39 +82,28 @@ const Customers = () => {
     }
   };
 
-  const updateCustomerDebt = async (customerId, amount) => {
-    // Assuming you have a column `total_debt` in your `customers` table
-    let { data, error } = await supabase
-      .from("customers")
-      .update({
-        total_debt: supabase.rpc("add_to_debt", { amount_to_add: amount }),
-      }) // Example: Use a stored procedure or direct operation
-      .eq("id", customerId);
-
-    if (error) {
-      console.error("Error updating customer debt:", error);
-      return;
-    }
-
-    alert(`Debt updated. New total: ${data[0].total_debt}`);
-    setShowModal(false); // Optionally close the modal after update
+  const handleEditDebtClick = (receiptId) => {
+    setActiveReceiptId(receiptId);
+    setShowEditDebtAlert(true);
   };
 
-  const markDebtAsPaid = async (customerId) => {
-    let { data, error } = await supabase
+  const updateReceiptDebtAmount = async () => {
+    if (!activeReceiptId || newDebtAmount === "") return;
+
+    const { data, error } = await supabase
       .from("receipts")
-      .update({ receipt_currentAmount: 0, receipt_ispaid: true }) // Ensure column names match your schema
-      .eq("customer_id", customerId); // Correctly target receipts by customer ID
-  
+      .update({ receipt_currentAmount: newDebtAmount })
+      .eq("id", activeReceiptId);
+
     if (error) {
-      console.error("Error marking debt as paid:", error);
-      return;
+      console.error("Error updating debt amount:", error);
+    } else {
+      alert("Debt amount updated successfully.");
+      // Reset state and close the alert
+      setNewDebtAmount("");
+      setShowEditDebtAlert(false);
     }
-  
-    alert("All debts for the customer marked as paid.");
-    // setShowModal(false); // Optionally close the modal after update
   };
-  
 
   //  This function is for searching customers in the database. It will be called when the user types in the search bar.
   const loadCustomers = async (searchCustomerTerm = "") => {
@@ -171,51 +169,120 @@ const Customers = () => {
             </IonToolbar>
           </IonHeader>
           <IonContent class="ion-padding">
-            <h2>Customer Details</h2>
-            <p>Name: {customerDetails?.customer_name}</p>
+            <h2>Recibos de {customerDetails?.customer_name}</h2>
 
-            <h2>Receipts:</h2>
-            <IonList>
-              {receipts.map((receipt, index) => (
-                <IonItem key={index}>
-                  <IonLabel>
-                    <p>{`Receipt ${index + 1}`}</p>
-                  </IonLabel>
-                  <IonText
-                    color="medium"
-                    style={{ display: "block", fontSize: "smaller" }}
-                  >
-                    <p>
-                      Date:{" "}
-                      {new Date(receipt.receipt_createddate).toLocaleDateString(
-                        "es-ES",
-                        {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        }
-                      )}
-                    </p>
-                    <IonText>Amount: {receipt.receipt_amount}</IonText>
-                  </IonText>
-                  <IonButton
-                    onClick={() =>
-                      updateCustomerDebt(
-                        customerDetails.id,
-                        receipt.receipt_amount
-                      )
-                    }
-                  >
-                    Update Debt
-                  </IonButton>
-                  <IonButton onClick={() => markDebtAsPaid(customerDetails.id)}>
-                    Mark as Paid
-                  </IonButton>
+            <IonAccordionGroup>
+              <IonAccordion value="receiptsAccordion">
+                <IonItem slot="header" color="light">
+                  <IonLabel>Recibos Activos</IonLabel>
                 </IonItem>
-              ))}
-            </IonList>
+                <IonList className="ion-padding" slot="content">
+                  {receipts.map((receipt, index) => (
+                    <IonItem
+                      key={index}
+                      onClick={() => handleEditDebtClick(receipt.id)}
+                    >
+                      <IonLabel>
+                        <h2>{`Recibo #${index + 1}`}</h2>
+
+                        <IonText color="medium" style={{ fontSize: "smaller" }}>
+                          <p>
+                            {new Date(
+                              receipt.receipt_createddate
+                            ).toLocaleDateString("es-ES", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </p>
+                        </IonText>
+                      </IonLabel>
+                      <IonBadge slot="end" style={{ backgroundColor: "green" }}>
+                        $
+                        {receipt.receipt_currentAmount ||
+                          receipt.receipt_amount}{" "}
+                        {/* Assuming you want to show currentAmount if available, else the original amount */}
+                      </IonBadge>
+                    </IonItem>
+                  ))}
+                </IonList>
+              </IonAccordion>
+              <IonAccordion value="paidReceipts">
+                <IonItem slot="header" color="light">
+                  <IonLabel>Recibos Pagados</IonLabel>
+                </IonItem>
+                <IonList className="ion-padding" slot="content">
+                  {receipts
+                    .filter((receipt) => receipt.receipt_ispaid)
+                    .map((receipt, index) => (
+                      <IonItem key={receipt.id}>
+                        <IonLabel>
+                          <h2>{`Recibo #${receipt.id}`}</h2>
+                          <IonText
+                            color="medium"
+                            style={{ fontSize: "smaller" }}
+                          >
+                            <p>
+                              Fecha:{" "}
+                              {new Date(
+                                receipt.receipt_createddate
+                              ).toLocaleDateString("es-ES", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}
+                            </p>
+                            <p>
+                              Monto: $
+                              {receipt.receipt_currentAmount ||
+                                receipt.receipt_amount}
+                            </p>
+                          </IonText>
+                        </IonLabel>
+                        <IonBadge
+                          slot="end"
+                          style={{ backgroundColor: "green" }}
+                        >
+                          $
+                          {receipt.receipt_currentAmount ||
+                            receipt.receipt_amount}
+                        </IonBadge>
+                      </IonItem>
+                    ))}
+                </IonList>
+              </IonAccordion>
+            </IonAccordionGroup>
           </IonContent>
         </IonModal>
+
+        <IonAlert
+          isOpen={showEditDebtAlert}
+          onDidDismiss={() => setShowEditDebtAlert(false)}
+          header={"Update Debt Amount"}
+          inputs={[
+            {
+              name: "newDebtAmount",
+              type: "number",
+              placeholder: "New Debt Amount",
+            },
+          ]}
+          buttons={[
+            {
+              text: "Cancel",
+              role: "cancel",
+              handler: () => {
+                setNewDebtAmount("");
+              },
+            },
+            {
+              text: "Update",
+              handler: (alertData) => {
+                setNewDebtAmount(alertData.newDebtAmount);
+                updateReceiptDebtAmount();
+              },
+            },
+          ]}
+        />
       </IonContent>
     </IonPage>
   );
