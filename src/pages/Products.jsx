@@ -27,9 +27,7 @@ import {
   IonModal,
   IonButtons,
   IonAvatar,
-  IonImg,
 } from "@ionic/react";
-import ExploreContainer from "../components/ExploreContainer";
 import "./StyleProducts.css";
 import {
   create,
@@ -335,7 +333,7 @@ const Products = () => {
           customer_updatedate: new Date(),
         })
         .eq("id", customerId);
-      setShowPayConfirmToast(true); // Show the payment confirmation toast
+      setShowPayConfirmToast(true);
       playNotificationSound();
 
       // Add the total and the customer ID to as a new record in the receipts table
@@ -344,10 +342,10 @@ const Products = () => {
         .insert([ // Insert the new receipt record
           {
             customer_id: customerId,
-            receipt_amount: tempTotalPrice,
-            receipt_currentAmount: tempTotalPrice,
-            receipt_createddate: new Date(),
-            receipt_ispaid: false,
+            receipt_initialDebt: tempTotalPrice,
+            receipt_remainingDebt: tempTotalPrice,
+            receipt_dateCreated: new Date(),
+            receipt_isPaid: false,
           },
         ]); // This will add a new record to the receipts table
 

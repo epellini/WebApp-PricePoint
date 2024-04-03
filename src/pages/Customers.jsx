@@ -42,14 +42,18 @@ const Customers = () => {
   const [newDebtAmount, setNewDebtAmount] = useState(0);
   const [activeReceiptId, setActiveReceiptId] = useState(null);
 
+  const [showCreteReceiptAlert, setShowCreateReceiptAlert] = useState(false);
+  const [tempTotalPrice, setTempTotalPrice] = useState(0);
+  const [activeCustomerId, setActiveCustomerId] = useState(null);
+
   useEffect(() => {
-    const loadCustomers = async () => {
+    const fetchCustomers = async () => {
       let { data, error } = await supabase.from("customers").select("*");
       if (error) throw error;
       setCustomers(data ?? []);
     };
-
-    loadCustomers();
+    // Fetch customers list when the component mounts
+    fetchCustomers();
   }, []);
 
   const fetchCustomerDetails = async (id) => {
@@ -63,13 +67,12 @@ const Customers = () => {
       console.error("Error fetching customer details:", customerError);
       return;
     }
-
     setCustomerDetails(customerData);
-    await loadReceipts(id); // Load receipts after setting customer details
+    await fetchReceipts(id); // Load receipts after setting customer details
     setShowModal(true);
   };
 
-  const loadReceipts = async (customerId) => {
+  const fetchReceipts = async (customerId) => {
     try {
       let { data, error } = await supabase
         .from("receipts")
@@ -87,12 +90,18 @@ const Customers = () => {
     setShowEditDebtAlert(true);
   };
 
-  const updateReceiptDebtAmount = async () => {
+  const handleCreateReceiptClick = (customerId) => {
+    setActiveCustomerId(customerId);
+    setShowCreateReceiptAlert(true);
+  };
+
+  // Buttton to update the debt amount of a receipt
+  const updateReceiptDebt = async () => {
     if (!activeReceiptId || newDebtAmount === "") return;
 
     const { data, error } = await supabase
       .from("receipts")
-      .update({ receipt_currentAmount: newDebtAmount })
+      .update({ remainingDebt: newDebtAmount })
       .eq("id", activeReceiptId);
 
     if (error) {
@@ -101,12 +110,37 @@ const Customers = () => {
       alert("Debt amount updated successfully.");
       // Reset state and close the alert
       setNewDebtAmount("");
+      fetchReceipts();
       setShowEditDebtAlert(false);
     }
   };
 
+  const createReceipt = async (customerId, price) => {
+    if (!customerId || price <= 0) return; // Ensure validation checks for both customerId and price
+
+    const { data: receiptData, error: receiptError } = await supabase
+      .from("receipts")
+      .insert([
+        {
+          customer_id: customerId,
+          initialDebt: price,
+          remainingDebt: price,
+          dateCreated: new Date(),
+          isPaid: false,
+        },
+      ]);
+
+    if (receiptError) {
+      console.error("Error creating receipt:", receiptError.message);
+    } else {
+      console.log("Receipt created successfully:", receiptData);
+      setTempTotalPrice(0); // Reset after successful creation
+      fetchReceipts(customerId); // Refresh receipts to show the new one
+      setShowCreateReceiptAlert(false); // Close the alert
+    }
+  };
   //  This function is for searching customers in the database. It will be called when the user types in the search bar.
-  const loadCustomers = async (searchCustomerTerm = "") => {
+  const searchCustomers = async (searchCustomerTerm = "") => {
     try {
       let query = supabase.from("customers").select("*");
       if (searchCustomerTerm) {
@@ -170,6 +204,11 @@ const Customers = () => {
           </IonHeader>
           <IonContent class="ion-padding">
             <h2>Recibos de {customerDetails?.customer_name}</h2>
+            <IonButton
+              onClick={() => handleCreateReceiptClick(customerDetails.id)}
+            >
+              ok
+            </IonButton>
 
             <IonAccordionGroup>
               <IonAccordion value="receiptsAccordion">
@@ -183,25 +222,46 @@ const Customers = () => {
                       onClick={() => handleEditDebtClick(receipt.id)}
                     >
                       <IonLabel>
-                        <h2>{`Recibo #${index + 1}`}</h2>
+                        <h2>
+                          {" "}
+                          <strong>{`Recibo #${index + 1}`}</strong>
+                        </h2>
+
+                        <IonText style={{ fontSize: "smaller" }}>
+                          <p>
+                            <strong>Último Pago:</strong>{" "}
+                            {receipt.dateLastPayment
+                              ? new Date(
+                                  receipt.dateLastPayment
+                                ).toLocaleDateString("es-ES", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })
+                              : "Aún no pagado"}
+                          </p>
+                        </IonText>
+
+                        <IonText style={{ fontSize: "smaller" }}>
+                          <p>
+                            <strong>Creado:</strong>{" "}
+                            {new Date(receipt.dateCreated).toLocaleDateString(
+                              "es-ES",
+                              {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              }
+                            )}
+                          </p>
+                        </IonText>
 
                         <IonText color="medium" style={{ fontSize: "smaller" }}>
-                          <p>
-                            {new Date(
-                              receipt.receipt_createddate
-                            ).toLocaleDateString("es-ES", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}
-                          </p>
+                          <p>Monto Inicial: ${receipt.initialDebt}</p>
                         </IonText>
                       </IonLabel>
                       <IonBadge slot="end" style={{ backgroundColor: "green" }}>
-                        $
-                        {receipt.receipt_currentAmount ||
-                          receipt.receipt_amount}{" "}
-                        {/* Assuming you want to show currentAmount if available, else the original amount */}
+                        ${receipt.remainingDebt}
                       </IonBadge>
                     </IonItem>
                   ))}
@@ -213,7 +273,7 @@ const Customers = () => {
                 </IonItem>
                 <IonList className="ion-padding" slot="content">
                   {receipts
-                    .filter((receipt) => receipt.receipt_ispaid)
+                    .filter((receipt) => receipt.isPaid)
                     .map((receipt, index) => (
                       <IonItem key={receipt.id}>
                         <IonLabel>
@@ -224,28 +284,23 @@ const Customers = () => {
                           >
                             <p>
                               Fecha:{" "}
-                              {new Date(
-                                receipt.receipt_createddate
-                              ).toLocaleDateString("es-ES", {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              })}
+                              {new Date(receipt.dateCreated).toLocaleDateString(
+                                "es-ES",
+                                {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                }
+                              )}
                             </p>
-                            <p>
-                              Monto: $
-                              {receipt.receipt_currentAmount ||
-                                receipt.receipt_amount}
-                            </p>
+                            <p>Monto: ${receipt.remainingDebt}</p>
                           </IonText>
                         </IonLabel>
                         <IonBadge
                           slot="end"
                           style={{ backgroundColor: "green" }}
                         >
-                          $
-                          {receipt.receipt_currentAmount ||
-                            receipt.receipt_amount}
+                          ${receipt.remainingDebt}
                         </IonBadge>
                       </IonItem>
                     ))}
@@ -278,7 +333,36 @@ const Customers = () => {
               text: "Update",
               handler: (alertData) => {
                 setNewDebtAmount(alertData.newDebtAmount);
-                updateReceiptDebtAmount();
+                updateReceiptDebt();
+              },
+            },
+          ]}
+        />
+
+        <IonAlert
+          isOpen={showCreteReceiptAlert}
+          onDidDismiss={() => setShowCreateReceiptAlert(false)}
+          header={"Add New Receipt"}
+          inputs={[
+            {
+              name: "debtAmount",
+              type: "number",
+              placeholder: "New Debt Amount",
+            },
+          ]}
+          buttons={[
+            {
+              text: "Cancel",
+              role: "cancel",
+              handler: () => {
+                setTempTotalPrice(0);
+              },
+            },
+            {
+              text: "Add",
+              handler: (alertData) => {
+                const price = parseFloat(alertData.debtAmount);
+                createReceipt(activeCustomerId, price);
               },
             },
           ]}
