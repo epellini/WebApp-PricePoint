@@ -27,6 +27,9 @@ import {
   IonToast,
   IonItemDivider,
   IonItemGroup,
+  IonItemSliding,
+  IonItemOption,
+  IonItemOptions,
 } from "@ionic/react";
 
 import {
@@ -34,6 +37,7 @@ import {
   cart,
   trash,
   closeCircle,
+  pin,
   add,
   chevronDownCircleOutline,
   personCircle,
@@ -65,6 +69,8 @@ const Customers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [totalPaidDebt, setTotalPaidDebt] = useState(0);
   const [paymentAmount, setPaymentAmount] = useState(0);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -169,8 +175,6 @@ const Customers = () => {
     }
   };
 
-
-
   const createReceipt = async (customerId, price) => {
     if (!customerId || price <= 0) return; // Ensure validation checks for both customerId and price
 
@@ -244,6 +248,40 @@ const Customers = () => {
     console.log(value);
   };
 
+  const confirmDelete = (itemId) => {
+    setItemToDelete(itemId); // Store the item ID to delete
+    setShowDeleteAlert(true); // Show the delete confirmation alert
+  };
+
+  const deleteItem = async (itemId) => {
+    try {
+      // Step 1: Delete all receipts associated with the customer
+      let { error: receiptsDeletionError } = await supabase
+        .from("receipts")
+        .delete()
+        .match({ customer_id: itemId });
+
+      if (receiptsDeletionError) {
+        throw receiptsDeletionError;
+      }
+
+      // Step 2: Delete the customer
+      let { error: customerDeletionError } = await supabase
+        .from("customers")
+        .delete()
+        .match({ id: itemId });
+
+      if (customerDeletionError) {
+        throw customerDeletionError;
+      }
+
+      // Step 3: Reload items after deletion
+      fetchCustomers(); // Assumes loadData is defined to fetch and update UI
+    } catch (error) {
+      alert(`Error: ${error.message}`);
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -266,28 +304,39 @@ const Customers = () => {
         </IonHeader>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end">
-          <IonFabButton    onClick={() => setShowAddPersonAlert(true)}>
+          <IonFabButton onClick={() => setShowAddPersonAlert(true)}>
             <IonIcon icon={add}></IonIcon>
           </IonFabButton>
         </IonFab>
 
-        <IonList>
+        <IonList inset={true}>
           {customers.map((customer) => (
-            <IonItem
-              key={customer.id}
-              button
-              onClick={() => fetchCustomerDetails(customer.id)}
-            >
-              <IonAvatar slot="start">
-                <IonImg
-                  src="https://ionicframework.com/docs/img/demos/avatar.svg"
-                  alt="Customer"
-                />
-              </IonAvatar>
-              <IonLabel>
-                <h2>{customer.customer_name}</h2>
-              </IonLabel>
-            </IonItem>
+            <IonItemSliding key={customer.id}>
+              <IonItem
+                key={customer.id}
+                button
+                onClick={() => fetchCustomerDetails(customer.id)}
+              >
+                <IonAvatar slot="start">
+                  <IonImg
+                    src="https://ionicframework.com/docs/img/demos/avatar.svg"
+                    alt="Customer"
+                  />
+                </IonAvatar>
+                <IonLabel>
+                  <h2>{customer.customer_name}</h2>
+                </IonLabel>
+              </IonItem>
+              <IonItemOptions slot="end">
+                <IonItemOption
+                  onClick={() => confirmDelete(customer.id)}
+                  expandable={true}
+                  color="danger"
+                >
+                  <IonIcon slot="icon-only" icon={trash}></IonIcon>
+                </IonItemOption>
+              </IonItemOptions>
+            </IonItemSliding>
           ))}
         </IonList>
 
@@ -493,6 +542,32 @@ const Customers = () => {
               text: "Aceptar",
               handler: (alertData) => {
                 addPerson(alertData.customerName);
+              },
+            },
+          ]}
+        />
+
+        {/* Alert to delete customer */}
+        <IonAlert
+          isOpen={showDeleteAlert}
+          onDidDismiss={() => setShowDeleteAlert(false)}
+          header="Verificar Eliminación"
+          message="¿Estás seguro de que deseas eliminar esta cuenta y todos los recibos asociados con ella?"
+          buttons={[
+            {
+              text: "Cancelar",
+              role: "cancel",
+              handler: () => {
+                setShowDeleteAlert(false); // Optionally reset itemToDelete here if not done on dismissal
+              },
+            },
+            {
+              text: "Sí",
+              handler: () => {
+                if (itemToDelete !== null) {
+                  deleteItem(itemToDelete);
+                  setItemToDelete(null); // Reset the itemToDelete after deletion
+                }
               },
             },
           ]}
