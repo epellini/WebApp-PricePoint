@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   IonContent,
   IonHeader,
@@ -21,16 +21,28 @@ import {
   IonAccordion,
   IonAccordionGroup,
   IonBadge,
+  IonFab,
+  IonFabButton,
+  IonFabList,
+  IonToast,
+  IonItemDivider,
+  IonItemGroup,
 } from "@ionic/react";
-import { closeCircle } from "ionicons/icons";
+
+import {
+  create,
+  cart,
+  trash,
+  closeCircle,
+  add,
+  chevronDownCircleOutline,
+  personCircle,
+  pricetag,
+} from "ionicons/icons";
 
 import "./StyleCustomers.css";
 
-import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from "./client";
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -39,12 +51,30 @@ const Customers = () => {
   const [receipts, setReceipts] = useState([]);
 
   const [showEditDebtAlert, setShowEditDebtAlert] = useState(false);
-  const [newDebtAmount, setNewDebtAmount] = useState(0);
+  const [newDebtAmount, setNewDebtAmount] = useState(null);
   const [activeReceiptId, setActiveReceiptId] = useState(null);
 
   const [showCreteReceiptAlert, setShowCreateReceiptAlert] = useState(false);
   const [tempTotalPrice, setTempTotalPrice] = useState(0);
   const [activeCustomerId, setActiveCustomerId] = useState(null);
+
+  const [showAddPersonAlert, setShowAddPersonAlert] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState(null);
+
+  const [showDebtUpdatedAlert, setShowDebtUpdatedAlert] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [totalPaidDebt, setTotalPaidDebt] = useState(0);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+
+  const fetchCustomers = async () => {
+    try {
+      let { data, error } = await supabase.from("customers").select("*");
+      if (error) throw error;
+      setCustomers(data ?? []);
+    } catch (error) {
+      console.error("Error fetching customers:", error.message);
+    }
+  };
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -52,6 +82,7 @@ const Customers = () => {
       if (error) throw error;
       setCustomers(data ?? []);
     };
+    searchCustomers();
     // Fetch customers list when the component mounts
     fetchCustomers();
   }, []);
@@ -79,6 +110,13 @@ const Customers = () => {
         .select("*")
         .eq("customer_id", customerId);
       if (error) throw error;
+
+      // Calculate total paid debt
+      const paidDebt = data
+        .filter((receipt) => receipt.isPaid)
+        .reduce((acc, curr) => acc + curr.initialDebt, 0);
+
+      setTotalPaidDebt(paidDebt);
       setReceipts(data ?? []);
     } catch (error) {
       console.error("Error loading receipts:", error);
@@ -96,24 +134,42 @@ const Customers = () => {
   };
 
   // Buttton to update the debt amount of a receipt
-  const updateReceiptDebt = async () => {
-    if (!activeReceiptId || newDebtAmount === "") return;
+  const updateReceiptDebt = async (payment) => {
+    if (!activeReceiptId || payment <= 0) return;
 
-    const { data, error } = await supabase
+    // Fetch the current debt amount of the receipt
+    const { data: receiptData, error: fetchError } = await supabase
       .from("receipts")
-      .update({ remainingDebt: newDebtAmount })
+      .select("remainingDebt")
+      .eq("id", activeReceiptId)
+      .single();
+
+    if (fetchError || !receiptData) {
+      console.error("Error fetching current receipt:", fetchError);
+      return;
+    }
+
+    const updatedDebtAmount = Math.max(receiptData.remainingDebt - payment, 0);
+    const isPaid = updatedDebtAmount === 0;
+
+    // Perform the update
+    const { error } = await supabase
+      .from("receipts")
+      .update({ remainingDebt: updatedDebtAmount, isPaid })
       .eq("id", activeReceiptId);
 
     if (error) {
       console.error("Error updating debt amount:", error);
     } else {
-      alert("Debt amount updated successfully.");
-      // Reset state and close the alert
-      setNewDebtAmount("");
-      fetchReceipts();
+      setShowDebtUpdatedAlert(true);
+      await fetchReceipts(customerDetails.id); // Refresh receipts data
+      await fetchCustomerDetails(customerDetails.id); // Refresh customer details (total debt
+      // updateCustomerTotalDebt(customerDetails.id);
       setShowEditDebtAlert(false);
     }
   };
+
+
 
   const createReceipt = async (customerId, price) => {
     if (!customerId || price <= 0) return; // Ensure validation checks for both customerId and price
@@ -135,33 +191,71 @@ const Customers = () => {
     } else {
       console.log("Receipt created successfully:", receiptData);
       setTempTotalPrice(0); // Reset after successful creation
+      fetchCustomerDetails(customerDetails.id); // Refresh customer details including total debt
       fetchReceipts(customerId); // Refresh receipts to show the new one
       setShowCreateReceiptAlert(false); // Close the alert
     }
   };
   //  This function is for searching customers in the database. It will be called when the user types in the search bar.
-  const searchCustomers = async (searchCustomerTerm = "") => {
+  const searchCustomers = async () => {
     try {
       let query = supabase.from("customers").select("*");
-      if (searchCustomerTerm) {
-        query = query.ilike("customer_name", `%${searchCustomerTerm}%`);
+      if (searchTerm) {
+        query = query.ilike("customer_name", `%${searchTerm}%`);
       }
-      let { data, error } = await query;
+      const { data, error } = await query;
       if (error) throw error;
-      setCustomers(
-        data.sort((a, b) => a.customer_name.localeCompare(b.customer_name)) ??
-          []
-      );
+      setCustomers(data ?? []);
+    } catch (error) {
+      console.error("Error searching customers:", error.message);
+    }
+  };
+
+  // Define a debounced version of the search function
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      searchCustomers(searchTerm);
+    }, 100); // Adjust the debounce time as needed
+
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
+  const addPerson = async (customerName) => {
+    try {
+      let { error } = await supabase.from("customers").insert([
+        {
+          customer_name: customerName,
+          customer_updatedate: new Date(),
+          customer_totaldebt: 0,
+          customer_doesowe: false,
+        },
+      ]);
+
+      if (error) throw error;
+
+      fetchCustomers(); // Assumes loadData is defined as before to fetch items
     } catch (error) {
       alert(error.message);
     }
+  };
+
+  const handleInput = (value) => {
+    setSearchTerm(value.toLowerCase());
+    console.log(value);
   };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Samboode</IonTitle>
+          <IonTitle>Cuentas</IonTitle>
+        </IonToolbar>
+        <IonToolbar>
+          <IonSearchbar
+            placeholder="Buscar cuenta"
+            debounce={200}
+            onIonInput={(e) => handleInput(e.detail.value)}
+          ></IonSearchbar>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
@@ -170,6 +264,12 @@ const Customers = () => {
             <IonTitle size="large">Cuentas</IonTitle>
           </IonToolbar>
         </IonHeader>
+
+        <IonFab slot="fixed" vertical="bottom" horizontal="end">
+          <IonFabButton    onClick={() => setShowAddPersonAlert(true)}>
+            <IonIcon icon={add}></IonIcon>
+          </IonFabButton>
+        </IonFab>
 
         <IonList>
           {customers.map((customer) => (
@@ -194,146 +294,237 @@ const Customers = () => {
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
           <IonHeader>
             <IonToolbar>
-              <IonTitle>{customerDetails?.customer_name}</IonTitle>
-              <IonButtons slot="end">
+              <IonTitle>Recibos de {customerDetails?.customer_name}</IonTitle>
+              <IonButtons slot="start">
                 <IonButton onClick={() => setShowModal(false)}>
-                  <IonIcon icon={closeCircle} />
+                  Cerrar
                 </IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
+
           <IonContent class="ion-padding">
-            <h2>Recibos de {customerDetails?.customer_name}</h2>
-            <IonButton
-              onClick={() => handleCreateReceiptClick(customerDetails.id)}
-            >
-              ok
-            </IonButton>
+            <h3>Lista de Recibos</h3>
+            <IonFab slot="fixed" vertical="top" horizontal="end">
+              <IonFabButton
+                onClick={() => handleCreateReceiptClick(customerDetails.id)}
+              >
+                <IonIcon icon={add}></IonIcon>
+              </IonFabButton>
+            </IonFab>
 
             <IonAccordionGroup>
               <IonAccordion value="receiptsAccordion">
                 <IonItem slot="header" color="light">
-                  <IonLabel>Recibos Activos</IonLabel>
+                  <IonLabel>Recibos Activos </IonLabel>
                 </IonItem>
                 <IonList className="ion-padding" slot="content">
-                  {receipts.map((receipt, index) => (
-                    <IonItem
-                      key={index}
-                      onClick={() => handleEditDebtClick(receipt.id)}
-                    >
+                  <IonItemGroup>
+                    <IonItemDivider>
                       <IonLabel>
-                        <h2>
-                          {" "}
-                          <strong>{`Recibo #${index + 1}`}</strong>
-                        </h2>
-
-                        <IonText style={{ fontSize: "smaller" }}>
-                          <p>
-                            <strong>Último Pago:</strong>{" "}
-                            {receipt.dateLastPayment
-                              ? new Date(
-                                  receipt.dateLastPayment
-                                ).toLocaleDateString("es-ES", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })
-                              : "Aún no pagado"}
-                          </p>
-                        </IonText>
-
-                        <IonText style={{ fontSize: "smaller" }}>
-                          <p>
-                            <strong>Creado:</strong>{" "}
-                            {new Date(receipt.dateCreated).toLocaleDateString(
-                              "es-ES",
-                              {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              }
-                            )}
-                          </p>
-                        </IonText>
-
-                        <IonText color="medium" style={{ fontSize: "smaller" }}>
-                          <p>Monto Inicial: ${receipt.initialDebt}</p>
-                        </IonText>
+                        Deuda Total: ${customerDetails?.customer_totaldebt}
                       </IonLabel>
-                      <IonBadge slot="end" style={{ backgroundColor: "green" }}>
-                        ${receipt.remainingDebt}
-                      </IonBadge>
-                    </IonItem>
-                  ))}
+                    </IonItemDivider>
+
+                    {receipts.filter((receipt) => !receipt.isPaid).length >
+                    0 ? (
+                      receipts
+                        .filter((receipt) => !receipt.isPaid)
+                        .map((receipt, index) => (
+                          <IonItem
+                            key={index}
+                            onClick={() => {
+                              const receiptToEdit = receipts.find(
+                                (r) => r.id === receipt.id
+                              );
+                              if (receiptToEdit) {
+                                setActiveReceiptId(receipt.id); // You already have this
+                                setShowEditDebtAlert(true); // You already have this
+                              }
+                            }}
+                          >
+                            <IonLabel>
+                              <h2>
+                                <strong>{`Recibo #${index + 1}`}</strong>
+                              </h2>
+                              <IonText style={{ fontSize: "smaller" }}>
+                                <p>
+                                  <strong>Último Pago:</strong>{" "}
+                                  {receipt.dateLastPayment
+                                    ? new Date(
+                                        receipt.dateLastPayment
+                                      ).toLocaleDateString("es-ES", {
+                                        year: "numeric",
+                                        month: "long",
+                                        day: "numeric",
+                                      })
+                                    : "Aún no pagado"}
+                                </p>
+                              </IonText>
+                              <IonText style={{ fontSize: "smaller" }}>
+                                <p>
+                                  <strong>Creado:</strong>{" "}
+                                  {new Date(
+                                    receipt.dateCreated
+                                  ).toLocaleDateString("es-ES", {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  })}
+                                </p>
+                              </IonText>
+                              <IonText
+                                color="medium"
+                                style={{ fontSize: "smaller" }}
+                              >
+                                <p>Monto Inicial: ${receipt.initialDebt}</p>
+                              </IonText>
+                            </IonLabel>
+                            <IonBadge
+                              slot="end"
+                              style={{ backgroundColor: "green" }}
+                            >
+                              ${receipt.remainingDebt}
+                            </IonBadge>
+                          </IonItem>
+                        ))
+                    ) : (
+                      <div style={{ padding: "16px", textAlign: "center" }}>
+                        No hay recibos activos
+                      </div>
+                    )}
+                  </IonItemGroup>
                 </IonList>
               </IonAccordion>
               <IonAccordion value="paidReceipts">
                 <IonItem slot="header" color="light">
                   <IonLabel>Recibos Pagados</IonLabel>
                 </IonItem>
+
                 <IonList className="ion-padding" slot="content">
-                  {receipts
-                    .filter((receipt) => receipt.isPaid)
-                    .map((receipt, index) => (
-                      <IonItem key={receipt.id}>
-                        <IonLabel>
-                          <h2>{`Recibo #${receipt.id}`}</h2>
-                          <IonText
-                            color="medium"
-                            style={{ fontSize: "smaller" }}
-                          >
-                            <p>
-                              Fecha:{" "}
-                              {new Date(receipt.dateCreated).toLocaleDateString(
-                                "es-ES",
-                                {
+                  <IonItemDivider>
+                    <IonLabel>
+                      Deuda Pagada: ${totalPaidDebt.toFixed(2)}
+                    </IonLabel>
+                  </IonItemDivider>
+
+                  {receipts.filter((receipt) => receipt.isPaid).length > 0 ? (
+                    receipts
+                      .filter((receipt) => receipt.isPaid)
+                      .map((receipt, index) => (
+                        <IonItem key={receipt.id}>
+                          <IonLabel>
+                            <h2>{`Recibo #${index + 1}`}</h2>
+                            <IonText style={{ fontSize: "smaller" }}>
+                              <p>
+                                <strong>Creado:</strong>{" "}
+                                {new Date(
+                                  receipt.dateCreated
+                                ).toLocaleDateString("es-ES", {
                                   year: "numeric",
                                   month: "long",
                                   day: "numeric",
-                                }
-                              )}
-                            </p>
-                            <p>Monto: ${receipt.remainingDebt}</p>
-                          </IonText>
-                        </IonLabel>
-                        <IonBadge
-                          slot="end"
-                          style={{ backgroundColor: "green" }}
-                        >
-                          ${receipt.remainingDebt}
-                        </IonBadge>
-                      </IonItem>
-                    ))}
+                                })}
+                              </p>
+                            </IonText>
+
+                            <IonText style={{ fontSize: "smaller" }}>
+                              <p>
+                                <strong>Último Pago:</strong>{" "}
+                                {receipt.dateLastPayment
+                                  ? new Date(
+                                      receipt.dateLastPayment
+                                    ).toLocaleDateString("es-ES", {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                    })
+                                  : "Aún no pagado"}
+                              </p>
+                            </IonText>
+
+                            <IonText
+                              color="medium"
+                              style={{ fontSize: "smaller" }}
+                            >
+                              <p>Monto Inicial: ${receipt.initialDebt}</p>
+                            </IonText>
+                          </IonLabel>
+                          <IonBadge
+                            slot="end"
+                            style={{ backgroundColor: "green" }}
+                          >
+                            ${receipt.remainingDebt}
+                          </IonBadge>
+                        </IonItem>
+                      ))
+                  ) : (
+                    <div style={{ padding: "16px", textAlign: "center" }}>
+                      No hay recibos pagados
+                    </div>
+                  )}
                 </IonList>
               </IonAccordion>
             </IonAccordionGroup>
           </IonContent>
         </IonModal>
 
+        {/* Alert to add new Person */}
         <IonAlert
-          isOpen={showEditDebtAlert}
-          onDidDismiss={() => setShowEditDebtAlert(false)}
-          header={"Update Debt Amount"}
+          isOpen={showAddPersonAlert}
+          onDidDismiss={() => setShowAddPersonAlert(false)}
+          header="Agregar persona"
           inputs={[
             {
-              name: "newDebtAmount",
-              type: "number",
-              placeholder: "New Debt Amount",
+              name: "customerName", // Add a name property for identification
+              type: "text",
+              placeholder: "Nombre de la persona",
             },
           ]}
           buttons={[
             {
-              text: "Cancel",
+              text: "Descartar",
               role: "cancel",
               handler: () => {
-                setNewDebtAmount("");
+                console.log("Cancel clicked");
               },
             },
             {
-              text: "Update",
+              text: "Aceptar",
               handler: (alertData) => {
-                setNewDebtAmount(alertData.newDebtAmount);
-                updateReceiptDebt();
+                addPerson(alertData.customerName);
+              },
+            },
+          ]}
+        />
+
+        <IonAlert
+          isOpen={showEditDebtAlert}
+          onDidDismiss={() => setShowEditDebtAlert(false)}
+          header={"Registrar Pago"}
+          inputs={[
+            {
+              name: "paymentAmount",
+              type: "number",
+              placeholder: "Cantidad Pagada",
+            },
+          ]}
+          buttons={[
+            {
+              text: "Cancelar",
+              role: "cancel",
+              handler: () => {
+                setNewDebtAmount(""); // You might need to adjust this part based on your state management
+              },
+            },
+            {
+              text: "Pagar",
+              handler: (alertData) => {
+                const payment = parseFloat(alertData.paymentAmount);
+                if (!isNaN(payment)) {
+                  // Make sure payment is a number
+                  updateReceiptDebt(payment);
+                }
               },
             },
           ]}
@@ -342,30 +533,40 @@ const Customers = () => {
         <IonAlert
           isOpen={showCreteReceiptAlert}
           onDidDismiss={() => setShowCreateReceiptAlert(false)}
-          header={"Add New Receipt"}
+          header={"Agregar Recibo"}
           inputs={[
             {
               name: "debtAmount",
               type: "number",
-              placeholder: "New Debt Amount",
+              placeholder: "Monto de Deuda",
             },
           ]}
           buttons={[
             {
-              text: "Cancel",
+              text: "Cancelar",
               role: "cancel",
               handler: () => {
                 setTempTotalPrice(0);
               },
             },
             {
-              text: "Add",
+              text: "Agregar",
               handler: (alertData) => {
                 const price = parseFloat(alertData.debtAmount);
                 createReceipt(activeCustomerId, price);
               },
             },
           ]}
+        />
+
+        {/* Toast for successful debt update */}
+        <IonToast
+          isOpen={showDebtUpdatedAlert}
+          onDidDismiss={() => setShowDebtUpdatedAlert(false)}
+          message="Transacción Registrada!"
+          position="top"
+          duration={2000} // Toast will dismiss after 2000ms
+          // cssClass="payment-confirmation-toast"
         />
       </IonContent>
     </IonPage>

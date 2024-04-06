@@ -39,11 +39,8 @@ import {
   pricetag,
 } from "ionicons/icons";
 
-import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+
+import { supabase } from './client';
 
 const Products = () => {
   const [editItem, setEditItem] = useState();
@@ -52,7 +49,6 @@ const Products = () => {
   const [items, setItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddProductAlert, setShowAddProductAlert] = useState(false);
-  const [showAddPersonAlert, setShowAddPersonAlert] = useState(false);
   const [tempInputName, setTempInputName] = useState("");
   const [tempInputPrice, setTempInputPrice] = useState("");
   const [showEditAlert, setShowEditAlert] = useState(false);
@@ -163,14 +159,13 @@ const Products = () => {
     }).format(price);
   };
 
-  const updateProductPrice = async (itemId, newPrice, newName) => {
+  const updateProductPrice = async (itemId, newPrice) => {
     try {
       const { data, error } = await supabase
         .from("products")
         .update({
           product_price: parseFloat(newPrice),
           product_updateDate: new Date(),
-          product_name: newName,
         })
         .match({ id: itemId });
 
@@ -196,27 +191,6 @@ const Products = () => {
 
       // Reload items after adding
       loadData(); // Assumes loadData is defined as before to fetch items
-    } catch (error) {
-      alert(error.message);
-    }
-  };
-
-  const addPerson = async (customerName) => {
-    try {
-      let { error } = await supabase.from("customers").insert([
-        {
-          customer_name: customerName,
-          customer_updatedate: new Date(),
-          customer_totaldebt: 0,
-          customer_doesowe: false,
-        },
-      ]);
-
-      if (error) throw error;
-
-      // Reload items after adding
-      // loadData(); Not needed since we're only adding customers
-      loadCustomers(); // Assumes loadData is defined as before to fetch items
     } catch (error) {
       alert(error.message);
     }
@@ -339,20 +313,19 @@ const Products = () => {
       // Add the total and the customer ID to as a new record in the receipts table
       const { data: receiptData, error: receiptError } = await supabase
         .from("receipts")
-        .insert([ // Insert the new receipt record
+        .insert([
+          // Insert the new receipt record
           {
             customer_id: customerId,
-            receipt_initialDebt: tempTotalPrice,
-            receipt_remainingDebt: tempTotalPrice,
-            receipt_dateCreated: new Date(),
-            receipt_isPaid: false,
+            initialDebt: tempTotalPrice,
+            remainingDebt: tempTotalPrice,
+            dateCreated: new Date(),
+            isPaid: false,
           },
         ]); // This will add a new record to the receipts table
 
       if (receiptError) throw receiptError;
       console.log("Receipt data:", receiptData); // This should not be null if a row was inserted
-
-      
 
       if (updateError) throw updateError;
       console.log("Update response:", updateData); // This should not be null if a row was updated
@@ -384,7 +357,7 @@ const Products = () => {
         <IonToolbar>
           <IonSearchbar
             placeholder="Buscar producto"
-            debounce={300}
+            debounce={200}
             onIonInput={(e) => handleInput(e.detail.value)}
           ></IonSearchbar>
         </IonToolbar>
@@ -405,24 +378,9 @@ const Products = () => {
         </IonHeader>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end">
-          <IonFabButton>
+          <IonFabButton onClick={() => setShowAddProductAlert(true)}>
             <IonIcon icon={add}></IonIcon>
           </IonFabButton>
-
-          <IonFabList side="top">
-            <IonFabButton
-              onClick={() => setShowAddProductAlert(true)}
-              color={"dark"}
-            >
-              <IonIcon icon={pricetag}></IonIcon>
-            </IonFabButton>
-            <IonFabButton
-              onClick={() => setShowAddPersonAlert(true)}
-              color={"dark"}
-            >
-              <IonIcon icon={personCircle}></IonIcon>
-            </IonFabButton>
-          </IonFabList>
         </IonFab>
 
         <IonList inset={true}>
@@ -469,7 +427,6 @@ const Products = () => {
                         (item) => item.id === product.id
                       );
                       if (productToEdit) {
-                        setCurrentProductName(productToEdit.product_name);
                         setCurrentProductPrice(
                           productToEdit.product_price.toString()
                         );
@@ -525,12 +482,6 @@ const Products = () => {
           header="Actualizar Precio"
           inputs={[
             {
-              name: "productName",
-              type: "text",
-              placeholder: "Nombre del producto",
-              value: currentProductName, // Ensures value is kept between edits
-            },
-            {
               name: "productPrice",
               type: "number",
               placeholder: "Precio",
@@ -584,35 +535,6 @@ const Products = () => {
               text: "Aceptar",
               handler: (alertData) => {
                 addItem(alertData.productName, alertData.productPrice);
-              },
-            },
-          ]}
-        />
-
-        {/* Alert to add new Person */}
-        <IonAlert
-          isOpen={showAddPersonAlert}
-          onDidDismiss={() => setShowAddPersonAlert(false)}
-          header="Agregar persona"
-          inputs={[
-            {
-              name: "customerName", // Add a name property for identification
-              type: "text",
-              placeholder: "Nombre de la persona",
-            },
-          ]}
-          buttons={[
-            {
-              text: "Descartar",
-              role: "cancel",
-              handler: () => {
-                console.log("Cancel clicked");
-              },
-            },
-            {
-              text: "Aceptar",
-              handler: (alertData) => {
-                addPerson(alertData.customerName);
               },
             },
           ]}
