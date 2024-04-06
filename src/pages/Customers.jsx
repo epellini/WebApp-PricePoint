@@ -72,6 +72,10 @@ const Customers = () => {
   const [itemToDelete, setItemToDelete] = useState(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
 
+  const [showEditCustomerAlert, setShowEditCustomerAlert] = useState(false);
+  const [currentCustomerName, setCurrentCustomerName] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+
   const fetchCustomers = async () => {
     try {
       let { data, error } = await supabase.from("customers").select("*");
@@ -282,6 +286,22 @@ const Customers = () => {
     }
   };
 
+  const updateCustomer = async (customerId, customerName) => {
+    try {
+      let { error } = await supabase
+        .from("customers")
+        .update({ customer_name: customerName })
+        .match({ id: customerId });
+
+      if (error) throw error;
+
+      // Refresh the customer list to reflect the update
+      fetchCustomers(); // Assumes fetchCustomers is your function to reload customer data
+    } catch (error) {
+      console.error("Error updating customer:", error.message);
+    }
+  };
+
   return (
     <IonPage>
       <IonHeader>
@@ -334,6 +354,16 @@ const Customers = () => {
                   color="danger"
                 >
                   <IonIcon slot="icon-only" icon={trash}></IonIcon>
+                </IonItemOption>
+                <IonItemOption
+                  color="warning"
+                  onClick={() => {
+                    setCurrentCustomerName(customer.customer_name);
+                    setSelectedCustomerId(customer.id);
+                    setShowEditCustomerAlert(true);
+                  }}
+                >
+                  <IonIcon slot="icon-only" icon={create}></IonIcon>
                 </IonItemOption>
               </IonItemOptions>
             </IonItemSliding>
@@ -568,6 +598,36 @@ const Customers = () => {
                   deleteItem(itemToDelete);
                   setItemToDelete(null); // Reset the itemToDelete after deletion
                 }
+              },
+            },
+          ]}
+        />
+
+        {/* Alert to edit customer */}
+        <IonAlert
+          isOpen={showEditCustomerAlert}
+          onDidDismiss={() => setShowEditCustomerAlert(false)}
+          header="Editar cliente"
+          inputs={[
+            {
+              name: "customerName",
+              type: "text",
+              value: currentCustomerName,
+              placeholder: "Nombre del Cliente",
+            },
+          ]}
+          buttons={[
+            {
+              text: "Cancelar",
+              role: "cancel",
+              handler: () => {
+                console.log("Edit cancelled");
+              },
+            },
+            {
+              text: "Guardar",
+              handler: (alertData) => {
+                updateCustomer(selectedCustomerId, alertData.customerName);
               },
             },
           ]}
