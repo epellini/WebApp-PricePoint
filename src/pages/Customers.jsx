@@ -42,6 +42,10 @@ import {
   chevronDownCircleOutline,
   personCircle,
   pricetag,
+  createOutline,
+  listCircle,
+  cashOutline,
+  walletOutline,
 } from "ionicons/icons";
 
 import "./StyleCustomers.css";
@@ -76,6 +80,8 @@ const Customers = () => {
   const [currentCustomerName, setCurrentCustomerName] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
 
+  const [totalDebt, setTotalDebt] = useState(0);
+
   const fetchCustomers = async () => {
     try {
       let { data, error } = await supabase.from("customers").select("*");
@@ -91,6 +97,11 @@ const Customers = () => {
       let { data, error } = await supabase.from("customers").select("*");
       if (error) throw error;
       setCustomers(data ?? []);
+      const total = (data ?? []).reduce(
+        (acc, customer) => acc + parseFloat(customer.customer_totaldebt || 0),
+        0
+      );
+      setTotalDebt(total);
     };
     searchCustomers();
     // Fetch customers list when the component mounts
@@ -165,7 +176,7 @@ const Customers = () => {
     // Perform the update
     const { error } = await supabase
       .from("receipts")
-      .update({ remainingDebt: updatedDebtAmount, isPaid })
+      .update({ remainingDebt: updatedDebtAmount, isPaid, dateLastPayment: new Date()})
       .eq("id", activeReceiptId);
 
     if (error) {
@@ -321,6 +332,16 @@ const Customers = () => {
           <IonToolbar>
             <IonTitle size="large">Cuentas</IonTitle>
           </IonToolbar>
+
+          <IonItemDivider className="mainDivider" color="danger">
+            <IonLabel>
+              Deuda Total: ${" "}
+              {totalDebt.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </IonLabel>
+          </IonItemDivider>
         </IonHeader>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end">
