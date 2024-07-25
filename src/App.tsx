@@ -32,12 +32,13 @@ import "@ionic/react/css/text-alignment.css";
 import "@ionic/react/css/text-transformation.css";
 import "@ionic/react/css/flex-utils.css";
 import "@ionic/react/css/display.css";
-
+import { Analytics } from "@vercel/analytics/react"
 /* Theme variables */
 import "./theme/variables.css";
 setupIonicReact();
 const App: React.FC = () => (
   <IonApp>
+    <Analytics/>
     <IonReactRouter>
       <IonTabs>
         <IonRouterOutlet>
