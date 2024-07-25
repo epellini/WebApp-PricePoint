@@ -134,6 +134,7 @@ const Products = () => {
       product_price: parseFloat(productPrice),
       product_updateDate: new Date().toISOString(),
     };
+    
     setItems([...items, newItem]);
   };
 
