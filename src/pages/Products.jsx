@@ -29,18 +29,10 @@ import {
   IonAvatar,
 } from "@ionic/react";
 import "./StyleProducts.css";
-import {
-  create,
-  cart,
-  trash,
-  add,
-  chevronDownCircleOutline,
-  personCircle,
-  pricetag,
-} from "ionicons/icons";
+import { create, cart, trash, add, chevronDownCircleOutline } from "ionicons/icons";
 
-
-import { supabase } from './client';
+// Import data from exampleData.js
+import { products as exampleProducts, customers as exampleCustomers } from "./exampleData";
 
 const Products = () => {
   const [editItem, setEditItem] = useState();
@@ -53,58 +45,39 @@ const Products = () => {
   const [tempInputPrice, setTempInputPrice] = useState("");
   const [showEditAlert, setShowEditAlert] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
-
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [totalPrice, setTotalPrice] = useState(0);
   const [showToast, setShowToast] = useState(false);
-
   const [currentProductName, setCurrentProductName] = useState("");
   const [currentProductPrice, setCurrentProductPrice] = useState("");
-
   const [customerName, setCustomerName] = useState("");
-
   const [validationError, setValidationError] = useState("");
-
-  const [showValidationErrorToast, setShowValidationErrorToast] =
-    useState(false);
+  const [showValidationErrorToast, setShowValidationErrorToast] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState("");
-
   const [productNameError, setProductNameError] = useState("");
   const [productPriceError, setProductPriceError] = useState("");
-
   const [customers, setCustomers] = useState([]);
   const [searchCustomerTerm, setSearchCustomerTerm] = useState("");
-
   const [tempTotalPrice, setTempTotalPrice] = useState(0);
-
   const [showPayConfirmToast, setShowPayConfirmToast] = useState(false);
 
   const notificationSound = new Audio("/paymentConfirmation.mp3");
 
-  // Function to play the notification sound
   const playNotificationSound = () => {
     notificationSound
       .play()
       .catch((error) => console.error("Error playing the sound:", error));
   };
 
-  // function to get customer list that will show up in modal when pay button is clicked
-  const loadCustomers = async (searchCustomerTerm = "") => {
-    try {
-      let query = supabase.from("customers").select("*");
-      if (searchCustomerTerm) {
-        query = query.ilike("customer_name", `%${searchCustomerTerm}%`);
-      }
-      let { data, error } = await query;
-      if (error) throw error;
-      setCustomers(
-        data.sort((a, b) => a.customer_name.localeCompare(b.customer_name)) ??
-          []
+  const loadCustomers = (searchCustomerTerm = "") => {
+    let filteredCustomers = exampleCustomers;
+    if (searchCustomerTerm) {
+      filteredCustomers = filteredCustomers.filter(customer =>
+        customer.customer_name.toLowerCase().includes(searchCustomerTerm.toLowerCase())
       );
-    } catch (error) {
-      alert(error.message);
     }
+    setCustomers(filteredCustomers.sort((a, b) => a.customer_name.localeCompare(b.customer_name)));
   };
 
   const handleCustomerSearch = (value) => {
@@ -115,7 +88,6 @@ const Products = () => {
 
   const handleInput = (value) => {
     setSearchTerm(value.toLowerCase());
-    console.log(value);
   };
 
   useEffect(() => {
@@ -123,28 +95,17 @@ const Products = () => {
   }, [searchTerm]);
 
   useEffect(() => {
-    loadCustomers(searchCustomerTerm); // This fetches customers based on searchCustomerTerm
-  }, [searchCustomerTerm]); // Re-fetches whenever searchCustomerTerm changes
+    loadCustomers(searchCustomerTerm);
+  }, [searchCustomerTerm]);
 
-  const loadData = async () => {
-    try {
-      let query = supabase.from("products").select("*");
-
-      if (searchTerm) {
-        query = query.ilike("product_name", `%${searchTerm}%`);
-      }
-
-      let { data, error } = await query;
-
-      if (error) throw error;
-
-      // Sort and set items
-      setItems(
-        data.sort((a, b) => a.product_name.localeCompare(b.product_name)) ?? []
+  const loadData = () => {
+    let filteredItems = exampleProducts;
+    if (searchTerm) {
+      filteredItems = filteredItems.filter(product =>
+        product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    } catch (error) {
-      alert(error.message);
     }
+    setItems(filteredItems.sort((a, b) => a.product_name.localeCompare(b.product_name)));
   };
 
   const addToBasket = (price) => {
@@ -159,78 +120,43 @@ const Products = () => {
     }).format(price);
   };
 
-  const updateProductPrice = async (itemId, newPrice) => {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .update({
-          product_price: parseFloat(newPrice),
-          product_updateDate: new Date(),
-        })
-        .match({ id: itemId });
-
-      if (error) throw error;
-
-      // After updating, reload the items to reflect the changes
-      loadData();
-    } catch (error) {
-      alert(error.message);
-    }
+  const updateProductPrice = (itemId, newPrice) => {
+    const updatedItems = items.map(item =>
+      item.id === itemId ? { ...item, product_price: parseFloat(newPrice), product_updateDate: new Date().toISOString() } : item
+    );
+    setItems(updatedItems);
   };
 
-  const addItem = async (productName, productPrice) => {
-    try {
-      let { error } = await supabase.from("products").insert([
-        {
-          product_name: productName,
-          product_price: parseFloat(productPrice),
-        },
-      ]);
-
-      if (error) throw error;
-
-      // Reload items after adding
-      loadData(); // Assumes loadData is defined as before to fetch items
-    } catch (error) {
-      alert(error.message);
-    }
+  const addItem = (productName, productPrice) => {
+    const newItem = {
+      id: items.length + 1,
+      product_name: productName,
+      product_price: parseFloat(productPrice),
+      product_updateDate: new Date().toISOString(),
+    };
+    setItems([...items, newItem]);
   };
 
-  function handleRefresh(event) {
+  const handleRefresh = (event) => {
     setTimeout(() => {
-      // Any calls to load data go here
       event.detail.complete();
-    }, 2000); // Increase this duration as needed
-  }
+    }, 2000);
+  };
 
   const confirmDelete = (itemId) => {
-    setItemToDelete(itemId); // Store the item ID to delete
-    setShowDeleteAlert(true); // Show the delete confirmation alert
+    setItemToDelete(itemId);
+    setShowDeleteAlert(true);
   };
 
-  const deleteItem = async (itemId) => {
-    try {
-      let { error } = await supabase
-        .from("products")
-        .delete()
-        .match({ id: itemId });
-
-      if (error) throw error;
-
-      // Reload items after deletion
-      loadData(); // Assumes loadData is defined as before to fetch items
-    } catch (error) {
-      alert(error.message);
-    }
+  const deleteItem = (itemId) => {
+    setItems(items.filter(item => item.id !== itemId));
   };
 
   const calculatePriceStatusColorClass = (product) => {
     const updateDate = product.product_updateDate;
     const updateDateTime = new Date(updateDate).getTime();
     const currentTime = new Date().getTime();
-    const diffDays = Math.floor(
-      (currentTime - updateDateTime) / (1000 * 3600 * 24)
-    );
+    const diffDays = Math.floor((currentTime - updateDateTime) / (1000 * 3600 * 24));
     let className;
 
     if (diffDays <= 7) {
@@ -243,11 +169,9 @@ const Products = () => {
       className = "red-badge";
     }
 
-    // console.log(`Product: ${product.product_name}, Status Class: ${className}`);
     return className;
   };
 
-  // For Searchbar Debounce
   const debounce = (func, wait) => {
     let timeout;
 
@@ -267,115 +191,42 @@ const Products = () => {
   };
 
   const handlePayClick = () => {
-    // Store the current total price temporarily before opening the modal
     setTempTotalPrice(totalPrice);
     openModal();
   };
 
-  const handleCustomerSelect = async (customerId, tempTotalPrice) => {
-    console.log(
-      `Attempting to update customer ${customerId} with amount ${tempTotalPrice}`
+  const handleCustomerSelect = (customerId, tempTotalPrice) => {
+    const updatedCustomers = customers.map(customer =>
+      customer.id === customerId ? { ...customer, customer_totaldebt: customer.customer_totaldebt + parseFloat(tempTotalPrice) } : customer
     );
-    try {
-      // Ensure tempTotalPrice is a number
-      tempTotalPrice = parseFloat(tempTotalPrice);
-      if (isNaN(tempTotalPrice)) {
-        console.error("tempTotalPrice is not a valid number");
-        return;
-      }
-
-      // Fetch the current total debt of the selected customer
-      let { data: currentDebtData, error: fetchError } = await supabase
-        .from("customers")
-        .select("customer_totaldebt")
-        .eq("id", customerId)
-        .single();
-
-      if (fetchError) throw fetchError;
-      console.log(`Current debt data:`, currentDebtData);
-
-      // Calculate the new total debt
-      const currentDebt = currentDebtData.customer_totaldebt || 0;
-      const newTotalDebt = currentDebt + tempTotalPrice;
-      console.log(`New total debt: ${newTotalDebt}`);
-
-      // Update the customer's total debt with the new amount
-      const { data: updateData, error: updateError } = await supabase
-        .from("customers")
-        .update({
-          customer_totaldebt: newTotalDebt,
-          customer_updatedate: new Date(),
-        })
-        .eq("id", customerId);
-      setShowPayConfirmToast(true);
-      playNotificationSound();
-
-      // Add the total and the customer ID to as a new record in the receipts table
-      const { data: receiptData, error: receiptError } = await supabase
-        .from("receipts")
-        .insert([
-          // Insert the new receipt record
-          {
-            customer_id: customerId,
-            initialDebt: tempTotalPrice,
-            remainingDebt: tempTotalPrice,
-            dateCreated: new Date(),
-            isPaid: false,
-          },
-        ]); // This will add a new record to the receipts table
-
-      if (receiptError) throw receiptError;
-      console.log("Receipt data:", receiptData); // This should not be null if a row was inserted
-
-      if (updateError) throw updateError;
-      console.log("Update response:", updateData); // This should not be null if a row was updated
-
-      if (updateData) {
-        console.log("Customer debt updated successfully");
-        // Reset tempTotalPrice after successful update
-        setTempTotalPrice(0);
-      } else {
-        console.log(
-          "No rows updated. Check if the customer ID exists and matches."
-        );
-      }
-
-      modal.current?.dismiss();
-      setTotalPrice(0); // Reset total price after successful update
-    } catch (error) {
-      console.error("Failed to update customer debt:", error);
-      alert(error.message);
-    }
+    setCustomers(updatedCustomers);
+    setShowPayConfirmToast(true);
+    playNotificationSound();
+    modal.current?.dismiss();
+    setTotalPrice(0);
   };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Productos</IonTitle>
+          <IonTitle>Products</IonTitle>
         </IonToolbar>
         <IonToolbar>
           <IonSearchbar
-            placeholder="Buscar producto"
+            placeholder="Search product"
             debounce={200}
             onIonInput={(e) => handleInput(e.detail.value)}
           ></IonSearchbar>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
-        {/* Refresher */}
         <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
           <IonRefresherContent
             pullingIcon={chevronDownCircleOutline}
             refreshingSpinner="circles"
           ></IonRefresherContent>
         </IonRefresher>
-
-        <IonHeader collapse="condense">
-          <IonToolbar>
-            <IonTitle size="large">Productos</IonTitle>
-          </IonToolbar>
-        </IonHeader>
 
         <IonFab slot="fixed" vertical="bottom" horizontal="end">
           <IonFabButton onClick={() => setShowAddProductAlert(true)}>
@@ -397,7 +248,7 @@ const Products = () => {
                       <p>
                         {new Date(
                           product.product_updateDate
-                        ).toLocaleDateString("es-ES", {
+                        ).toLocaleDateString("en-US", {
                           year: "numeric",
                           month: "long",
                           day: "numeric",
@@ -437,10 +288,9 @@ const Products = () => {
                   >
                     <IonIcon slot="icon-only" icon={create}></IonIcon>
                   </IonItemOption>
-                  {/* Add Item to Basket */}
                   <IonItemOption
                     color="tertiary"
-                    onClick={() => addToBasket(product.product_price)} // Assuming product.product_price is the price of the item
+                    onClick={() => addToBasket(product.product_price)}
                   >
                     <IonIcon slot="icon-only" icon={cart}></IonIcon>
                   </IonItemOption>
@@ -449,55 +299,52 @@ const Products = () => {
             ))}
         </IonList>
 
-        {/* Alert to delete product */}
         <IonAlert
           isOpen={showDeleteAlert}
           onDidDismiss={() => setShowDeleteAlert(false)}
-          header="Verificar eliminación"
-          message="¿Estás seguro de que deseas eliminar este producto?"
+          header="Confirm Deletion"
+          message="Are you sure you want to delete this product?"
           buttons={[
             {
-              text: "Cancelar",
+              text: "Cancel",
               role: "cancel",
               handler: () => {
-                setShowDeleteAlert(false); // Optionally reset itemToDelete here if not done on dismissal
+                setShowDeleteAlert(false);
               },
             },
             {
-              text: "Sí",
+              text: "Yes",
               handler: () => {
                 if (itemToDelete !== null) {
                   deleteItem(itemToDelete);
-                  setItemToDelete(null); // Reset the itemToDelete after deletion
+                  setItemToDelete(null);
                 }
               },
             },
           ]}
         />
 
-        {/* Alert to change price */}
         <IonAlert
           isOpen={showEditAlert}
           onDidDismiss={() => setShowEditAlert(false)}
-          header="Actualizar Precio"
+          header="Update Price"
           inputs={[
             {
               name: "productPrice",
               type: "number",
-              placeholder: "Precio",
-              value: currentProductPrice, // Ensures value is kept between edits
+              placeholder: "Price",
+              value: currentProductPrice,
             },
           ]}
           buttons={[
             {
-              text: "Cancelar",
+              text: "Cancel",
               role: "cancel",
               handler: () => setShowEditAlert(false),
             },
             {
-              text: "Aceptar",
+              text: "Accept",
               handler: (alertData) => {
-                // Assuming the new price is provided, call the update function here
                 if (selectedItemId !== null) {
                   updateProductPrice(selectedItemId, alertData.productPrice);
                 }
@@ -506,33 +353,32 @@ const Products = () => {
           ]}
         />
 
-        {/* Alert to add new Item */}
         <IonAlert
           isOpen={showAddProductAlert}
           onDidDismiss={() => setShowAddProductAlert(false)}
-          header="Agregar producto"
+          header="Add Product"
           inputs={[
             {
-              name: "productName", // Add a name property for identification
+              name: "productName",
               type: "text",
-              placeholder: "Nombre del producto",
+              placeholder: "Product name",
             },
             {
               name: "productPrice",
               type: "number",
-              placeholder: "Precio",
+              placeholder: "Price",
             },
           ]}
           buttons={[
             {
-              text: "Descartar",
+              text: "Discard",
               role: "cancel",
               handler: () => {
                 console.log("Cancel clicked");
               },
             },
             {
-              text: "Aceptar",
+              text: "Accept",
               handler: (alertData) => {
                 addItem(alertData.productName, alertData.productPrice);
               },
@@ -545,20 +391,20 @@ const Products = () => {
           onDidDismiss={() => {
             setShowToast(false);
             setTotalPrice(0);
-          }} // Reset total on dismiss
+          }}
           message={`Total: $${totalPrice.toFixed(2)}`}
-          duration={0} // Adjust duration as needed
-          cssClass="custom-toast" // Apply the custom CSS class
+          duration={0}
+          cssClass="custom-toast"
           buttons={[
             {
-              text: "Descartar",
+              text: "Discard",
               role: "cancel",
               handler: () => {
                 console.log("Dismiss clicked");
               },
             },
             {
-              text: "Pagar",
+              text: "Pay",
               role: "pay",
               handler: () => {
                 handlePayClick();
@@ -568,17 +414,14 @@ const Products = () => {
           ]}
         />
 
-        {/* Toast for successful payment */}
         <IonToast
           isOpen={showPayConfirmToast}
           onDidDismiss={() => setShowPayConfirmToast(false)}
-          message="Transacción Registrada!"
+          message="Transaction Registered!"
           position="top"
-          duration={2000} // Toast will dismiss after 2000ms
+          duration={2000}
           cssClass="payment-confirmation-toast"
         />
-
-        {/* Modal that brings up the customers */}
 
         <IonModal
           ref={modal}
@@ -622,7 +465,6 @@ const Products = () => {
                   </IonAvatar>
                   <IonLabel>
                     <h2>{customer.customer_name}</h2>
-                    {/* Add other customer details here as needed */}
                   </IonLabel>
                 </IonItem>
               ))}

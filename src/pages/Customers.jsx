@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import {
   IonContent,
   IonHeader,
@@ -17,13 +17,11 @@ import {
   IonText,
   IonAlert,
   IonSearchbar,
-  IonInput,
   IonAccordion,
   IonAccordionGroup,
   IonBadge,
   IonFab,
   IonFabButton,
-  IonFabList,
   IonToast,
   IonItemDivider,
   IonItemGroup,
@@ -31,117 +29,72 @@ import {
   IonItemOption,
   IonItemOptions,
 } from "@ionic/react";
-
 import {
   create,
-  cart,
   trash,
-  closeCircle,
-  pin,
   add,
-  chevronDownCircleOutline,
-  personCircle,
-  pricetag,
-  createOutline,
-  listCircle,
-  cashOutline,
-  walletOutline,
 } from "ionicons/icons";
 
 import "./StyleCustomers.css";
 
-import { supabase } from "./client";
+// Import data from exampleData.js
+import { customers as exampleCustomers, receipts as exampleReceipts } from "./exampleData";
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [customerDetails, setCustomerDetails] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [receipts, setReceipts] = useState([]);
-
   const [showEditDebtAlert, setShowEditDebtAlert] = useState(false);
   const [newDebtAmount, setNewDebtAmount] = useState(null);
   const [activeReceiptId, setActiveReceiptId] = useState(null);
-
-  const [showCreteReceiptAlert, setShowCreateReceiptAlert] = useState(false);
+  const [showCreateReceiptAlert, setShowCreateReceiptAlert] = useState(false);
   const [tempTotalPrice, setTempTotalPrice] = useState(0);
   const [activeCustomerId, setActiveCustomerId] = useState(null);
-
   const [showAddPersonAlert, setShowAddPersonAlert] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
-
   const [showDebtUpdatedAlert, setShowDebtUpdatedAlert] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [totalPaidDebt, setTotalPaidDebt] = useState(0);
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
-
   const [showEditCustomerAlert, setShowEditCustomerAlert] = useState(false);
   const [currentCustomerName, setCurrentCustomerName] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
-
   const [totalDebt, setTotalDebt] = useState(0);
 
-  const fetchCustomers = async () => {
-    try {
-      let { data, error } = await supabase.from("customers").select("*");
-      if (error) throw error;
-      setCustomers(data ?? []);
-    } catch (error) {
-      console.error("Error fetching customers:", error.message);
-    }
-  };
-
   useEffect(() => {
-    const fetchCustomers = async () => {
-      let { data, error } = await supabase.from("customers").select("*");
-      if (error) throw error;
-      setCustomers(data ?? []);
-      const total = (data ?? []).reduce(
-        (acc, customer) => acc + parseFloat(customer.customer_totaldebt || 0),
-        0
-      );
-      setTotalDebt(total);
-    };
-    searchCustomers();
-    // Fetch customers list when the component mounts
-    fetchCustomers();
+    loadCustomers();
   }, []);
 
-  const fetchCustomerDetails = async (id) => {
-    let { data: customerData, error: customerError } = await supabase
-      .from("customers")
-      .select("*")
-      .eq("id", id)
-      .single();
+  const loadCustomers = () => {
+    setCustomers(exampleCustomers);
+    const total = exampleCustomers.reduce(
+      (acc, customer) => acc + parseFloat(customer.customer_totaldebt || 0),
+      0
+    );
+    setTotalDebt(total);
+  };
 
-    if (customerError) {
-      console.error("Error fetching customer details:", customerError);
-      return;
-    }
+  const fetchCustomerDetails = (id) => {
+    const customerData = exampleCustomers.find((customer) => customer.id === id);
     setCustomerDetails(customerData);
-    await fetchReceipts(id); // Load receipts after setting customer details
+    fetchReceipts(id);
     setShowModal(true);
   };
 
-  const fetchReceipts = async (customerId) => {
-    try {
-      let { data, error } = await supabase
-        .from("receipts")
-        .select("*")
-        .eq("customer_id", customerId);
-      if (error) throw error;
+  const fetchReceipts = (customerId) => {
+    const customerReceipts = exampleReceipts.filter(
+      (receipt) => receipt.customer_id === customerId
+    );
 
-      // Calculate total paid debt
-      const paidDebt = data
-        .filter((receipt) => receipt.isPaid)
-        .reduce((acc, curr) => acc + curr.initialDebt, 0);
+    const paidDebt = customerReceipts
+      .filter((receipt) => receipt.isPaid)
+      .reduce((acc, curr) => acc + curr.initialDebt, 0);
 
-      setTotalPaidDebt(paidDebt);
-      setReceipts(data ?? []);
-    } catch (error) {
-      console.error("Error loading receipts:", error);
-    }
+    setTotalPaidDebt(paidDebt);
+    setReceipts(customerReceipts);
   };
 
   const handleEditDebtClick = (receiptId) => {
@@ -154,174 +107,120 @@ const Customers = () => {
     setShowCreateReceiptAlert(true);
   };
 
-  // Buttton to update the debt amount of a receipt
-  const updateReceiptDebt = async (payment) => {
+  const updateReceiptDebt = (payment) => {
     if (!activeReceiptId || payment <= 0) return;
 
-    // Fetch the current debt amount of the receipt
-    const { data: receiptData, error: fetchError } = await supabase
-      .from("receipts")
-      .select("remainingDebt")
-      .eq("id", activeReceiptId)
-      .single();
+    const receiptIndex = receipts.findIndex(
+      (receipt) => receipt.id === activeReceiptId
+    );
+    if (receiptIndex === -1) return;
 
-    if (fetchError || !receiptData) {
-      console.error("Error fetching current receipt:", fetchError);
-      return;
-    }
-
-    const updatedDebtAmount = Math.max(receiptData.remainingDebt - payment, 0);
+    const updatedDebtAmount = Math.max(
+      receipts[receiptIndex].remainingDebt - payment,
+      0
+    );
     const isPaid = updatedDebtAmount === 0;
 
-    // Perform the update
-    const { error } = await supabase
-      .from("receipts")
-      .update({ remainingDebt: updatedDebtAmount, isPaid, dateLastPayment: new Date()})
-      .eq("id", activeReceiptId);
+    const updatedReceipts = [...receipts];
+    updatedReceipts[receiptIndex] = {
+      ...updatedReceipts[receiptIndex],
+      remainingDebt: updatedDebtAmount,
+      isPaid,
+      dateLastPayment: new Date().toISOString(),
+    };
 
-    if (error) {
-      console.error("Error updating debt amount:", error);
-    } else {
-      setShowDebtUpdatedAlert(true);
-      await fetchReceipts(customerDetails.id); // Refresh receipts data
-      await fetchCustomerDetails(customerDetails.id); // Refresh customer details (total debt
-      // updateCustomerTotalDebt(customerDetails.id);
-      setShowEditDebtAlert(false);
-    }
+    setReceipts(updatedReceipts);
+    setShowDebtUpdatedAlert(true);
+    fetchCustomerDetails(customerDetails.id);
+    setShowEditDebtAlert(false);
   };
 
-  const createReceipt = async (customerId, price) => {
-    if (!customerId || price <= 0) return; // Ensure validation checks for both customerId and price
+  const createReceipt = (customerId, price) => {
+    if (!customerId || price <= 0) return;
 
-    const { data: receiptData, error: receiptError } = await supabase
-      .from("receipts")
-      .insert([
-        {
-          customer_id: customerId,
-          initialDebt: price,
-          remainingDebt: price,
-          dateCreated: new Date(),
-          isPaid: false,
-        },
-      ]);
+    const newReceipt = {
+      id: receipts.length + 1,
+      customer_id: customerId,
+      initialDebt: price,
+      remainingDebt: price,
+      dateCreated: new Date().toISOString(),
+      isPaid: false,
+    };
 
-    if (receiptError) {
-      console.error("Error creating receipt:", receiptError.message);
-    } else {
-      console.log("Receipt created successfully:", receiptData);
-      setTempTotalPrice(0); // Reset after successful creation
-      fetchCustomerDetails(customerDetails.id); // Refresh customer details including total debt
-      fetchReceipts(customerId); // Refresh receipts to show the new one
-      setShowCreateReceiptAlert(false); // Close the alert
-    }
-  };
-  //  This function is for searching customers in the database. It will be called when the user types in the search bar.
-  const searchCustomers = async () => {
-    try {
-      let query = supabase.from("customers").select("*");
-      if (searchTerm) {
-        query = query.ilike("customer_name", `%${searchTerm}%`);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      setCustomers(data ?? []);
-    } catch (error) {
-      console.error("Error searching customers:", error.message);
-    }
+    setReceipts([...receipts, newReceipt]);
+    fetchCustomerDetails(customerDetails.id);
+    setShowCreateReceiptAlert(false);
   };
 
-  // Define a debounced version of the search function
+  const searchCustomers = () => {
+    let filteredCustomers = exampleCustomers;
+    if (searchTerm) {
+      filteredCustomers = filteredCustomers.filter((customer) =>
+        customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    setCustomers(filteredCustomers);
+  };
+
   useEffect(() => {
     const handler = setTimeout(() => {
-      searchCustomers(searchTerm);
-    }, 100); // Adjust the debounce time as needed
+      searchCustomers();
+    }, 100);
 
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  const addPerson = async (customerName) => {
-    try {
-      let { error } = await supabase.from("customers").insert([
-        {
-          customer_name: customerName,
-          customer_updatedate: new Date(),
-          customer_totaldebt: 0,
-          customer_doesowe: false,
-        },
-      ]);
+  const addPerson = (customerName) => {
+    const newCustomer = {
+      id: customers.length + 1,
+      customer_name: customerName,
+      customer_updatedate: new Date().toISOString(),
+      customer_totaldebt: 0,
+      customer_doesowe: false,
+    };
 
-      if (error) throw error;
-
-      fetchCustomers(); // Assumes loadData is defined as before to fetch items
-    } catch (error) {
-      alert(error.message);
-    }
+    setCustomers([...customers, newCustomer]);
   };
 
   const handleInput = (value) => {
     setSearchTerm(value.toLowerCase());
-    console.log(value);
   };
 
   const confirmDelete = (itemId) => {
-    setItemToDelete(itemId); // Store the item ID to delete
-    setShowDeleteAlert(true); // Show the delete confirmation alert
+    setItemToDelete(itemId);
+    setShowDeleteAlert(true);
   };
 
-  const deleteItem = async (itemId) => {
-    try {
-      // Step 1: Delete all receipts associated with the customer
-      let { error: receiptsDeletionError } = await supabase
-        .from("receipts")
-        .delete()
-        .match({ customer_id: itemId });
+  const deleteItem = (itemId) => {
+    const updatedCustomers = customers.filter(
+      (customer) => customer.id !== itemId
+    );
+    const updatedReceipts = receipts.filter(
+      (receipt) => receipt.customer_id !== itemId
+    );
 
-      if (receiptsDeletionError) {
-        throw receiptsDeletionError;
-      }
-
-      // Step 2: Delete the customer
-      let { error: customerDeletionError } = await supabase
-        .from("customers")
-        .delete()
-        .match({ id: itemId });
-
-      if (customerDeletionError) {
-        throw customerDeletionError;
-      }
-
-      // Step 3: Reload items after deletion
-      fetchCustomers(); // Assumes loadData is defined to fetch and update UI
-    } catch (error) {
-      alert(`Error: ${error.message}`);
-    }
+    setCustomers(updatedCustomers);
+    setReceipts(updatedReceipts);
   };
 
-  const updateCustomer = async (customerId, customerName) => {
-    try {
-      let { error } = await supabase
-        .from("customers")
-        .update({ customer_name: customerName })
-        .match({ id: customerId });
-
-      if (error) throw error;
-
-      // Refresh the customer list to reflect the update
-      fetchCustomers(); // Assumes fetchCustomers is your function to reload customer data
-    } catch (error) {
-      console.error("Error updating customer:", error.message);
-    }
+  const updateCustomer = (customerId, customerName) => {
+    const updatedCustomers = customers.map((customer) =>
+      customer.id === customerId
+        ? { ...customer, customer_name: customerName }
+        : customer
+    );
+    setCustomers(updatedCustomers);
   };
 
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Cuentas</IonTitle>
+          <IonTitle>Accounts</IonTitle>
         </IonToolbar>
         <IonToolbar>
           <IonSearchbar
-            placeholder="Buscar cuenta"
+            placeholder="Search account"
             debounce={200}
             onIonInput={(e) => handleInput(e.detail.value)}
           ></IonSearchbar>
@@ -330,12 +229,12 @@ const Customers = () => {
       <IonContent fullscreen>
         <IonHeader collapse="condense">
           <IonToolbar>
-            <IonTitle size="large">Cuentas</IonTitle>
+            <IonTitle size="large">Accounts</IonTitle>
           </IonToolbar>
 
           <IonItemDivider className="mainDivider" color="danger">
             <IonLabel>
-              Deuda Total: ${" "}
+              Total Debt: $
               {totalDebt.toLocaleString(undefined, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
@@ -394,17 +293,15 @@ const Customers = () => {
         <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
           <IonHeader>
             <IonToolbar>
-              <IonTitle>Recibos de {customerDetails?.customer_name}</IonTitle>
+              <IonTitle>Receipts of {customerDetails?.customer_name}</IonTitle>
               <IonButtons slot="start">
-                <IonButton onClick={() => setShowModal(false)}>
-                  Cerrar
-                </IonButton>
+                <IonButton onClick={() => setShowModal(false)}>Close</IonButton>
               </IonButtons>
             </IonToolbar>
           </IonHeader>
 
           <IonContent class="ion-padding">
-            <h3>Lista de Recibos</h3>
+            <h3>Receipt List</h3>
             <IonFab slot="fixed" vertical="top" horizontal="end">
               <IonFabButton
                 onClick={() => handleCreateReceiptClick(customerDetails.id)}
@@ -416,18 +313,17 @@ const Customers = () => {
             <IonAccordionGroup>
               <IonAccordion value="receiptsAccordion">
                 <IonItem slot="header" color="light">
-                  <IonLabel>Recibos Activos </IonLabel>
+                  <IonLabel>Active Receipts</IonLabel>
                 </IonItem>
                 <IonList className="ion-padding" slot="content">
                   <IonItemGroup>
                     <IonItemDivider>
                       <IonLabel>
-                        Deuda Total: ${customerDetails?.customer_totaldebt}
+                        Total Debt: ${customerDetails?.customer_totaldebt}
                       </IonLabel>
                     </IonItemDivider>
 
-                    {receipts.filter((receipt) => !receipt.isPaid).length >
-                    0 ? (
+                    {receipts.filter((receipt) => !receipt.isPaid).length > 0 ? (
                       receipts
                         .filter((receipt) => !receipt.isPaid)
                         .map((receipt, index) => (
@@ -438,46 +334,47 @@ const Customers = () => {
                                 (r) => r.id === receipt.id
                               );
                               if (receiptToEdit) {
-                                setActiveReceiptId(receipt.id); // You already have this
-                                setShowEditDebtAlert(true); // You already have this
+                                setActiveReceiptId(receipt.id);
+                                setShowEditDebtAlert(true);
                               }
                             }}
                           >
                             <IonLabel>
                               <h2>
-                                <strong>{`Recibo #${index + 1}`}</strong>
+                                <strong>{`Receipt #${index + 1}`}</strong>
                               </h2>
                               <IonText style={{ fontSize: "smaller" }}>
                                 <p>
-                                  <strong>Último Pago:</strong>{" "}
+                                  <strong>Last Payment:</strong>{" "}
                                   {receipt.dateLastPayment
                                     ? new Date(
                                         receipt.dateLastPayment
-                                      ).toLocaleDateString("es-ES", {
+                                      ).toLocaleDateString("en-US", {
                                         year: "numeric",
                                         month: "long",
                                         day: "numeric",
                                       })
-                                    : "Aún no pagado"}
+                                    : "Not paid yet"}
                                 </p>
                               </IonText>
                               <IonText style={{ fontSize: "smaller" }}>
                                 <p>
-                                  <strong>Creado:</strong>{" "}
-                                  {new Date(
-                                    receipt.dateCreated
-                                  ).toLocaleDateString("es-ES", {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  })}
+                                  <strong>Created:</strong>{" "}
+                                  {new Date(receipt.dateCreated).toLocaleDateString(
+                                    "en-US",
+                                    {
+                                      year: "numeric",
+                                      month: "long",
+                                      day: "numeric",
+                                    }
+                                  )}
                                 </p>
                               </IonText>
                               <IonText
                                 color="medium"
                                 style={{ fontSize: "smaller" }}
                               >
-                                <p>Monto Inicial: ${receipt.initialDebt}</p>
+                                <p>Initial Amount: ${receipt.initialDebt}</p>
                               </IonText>
                             </IonLabel>
                             <IonBadge
@@ -490,7 +387,7 @@ const Customers = () => {
                         ))
                     ) : (
                       <div style={{ padding: "16px", textAlign: "center" }}>
-                        No hay recibos activos
+                        No active receipts
                       </div>
                     )}
                   </IonItemGroup>
@@ -498,13 +395,13 @@ const Customers = () => {
               </IonAccordion>
               <IonAccordion value="paidReceipts">
                 <IonItem slot="header" color="light">
-                  <IonLabel>Recibos Pagados</IonLabel>
+                  <IonLabel>Paid Receipts</IonLabel>
                 </IonItem>
 
                 <IonList className="ion-padding" slot="content">
                   <IonItemDivider>
                     <IonLabel>
-                      Deuda Pagada: ${totalPaidDebt.toFixed(2)}
+                      Paid Debt: ${totalPaidDebt.toFixed(2)}
                     </IonLabel>
                   </IonItemDivider>
 
@@ -514,32 +411,33 @@ const Customers = () => {
                       .map((receipt, index) => (
                         <IonItem key={receipt.id}>
                           <IonLabel>
-                            <h2>{`Recibo #${index + 1}`}</h2>
+                            <h2>{`Receipt #${index + 1}`}</h2>
                             <IonText style={{ fontSize: "smaller" }}>
                               <p>
-                                <strong>Creado:</strong>{" "}
-                                {new Date(
-                                  receipt.dateCreated
-                                ).toLocaleDateString("es-ES", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })}
+                                <strong>Created:</strong>{" "}
+                                {new Date(receipt.dateCreated).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  }
+                                )}
                               </p>
                             </IonText>
 
                             <IonText style={{ fontSize: "smaller" }}>
                               <p>
-                                <strong>Último Pago:</strong>{" "}
+                                <strong>Last Payment:</strong>{" "}
                                 {receipt.dateLastPayment
                                   ? new Date(
                                       receipt.dateLastPayment
-                                    ).toLocaleDateString("es-ES", {
+                                    ).toLocaleDateString("en-US", {
                                       year: "numeric",
                                       month: "long",
                                       day: "numeric",
                                     })
-                                  : "Aún no pagado"}
+                                  : "Not paid yet"}
                               </p>
                             </IonText>
 
@@ -547,7 +445,7 @@ const Customers = () => {
                               color="medium"
                               style={{ fontSize: "smaller" }}
                             >
-                              <p>Monto Inicial: ${receipt.initialDebt}</p>
+                              <p>Initial Amount: ${receipt.initialDebt}</p>
                             </IonText>
                           </IonLabel>
                           <IonBadge
@@ -560,7 +458,7 @@ const Customers = () => {
                       ))
                   ) : (
                     <div style={{ padding: "16px", textAlign: "center" }}>
-                      No hay recibos pagados
+                      No paid receipts
                     </div>
                   )}
                 </IonList>
@@ -569,28 +467,27 @@ const Customers = () => {
           </IonContent>
         </IonModal>
 
-        {/* Alert to add new Person */}
         <IonAlert
           isOpen={showAddPersonAlert}
           onDidDismiss={() => setShowAddPersonAlert(false)}
-          header="Agregar persona"
+          header="Add Person"
           inputs={[
             {
-              name: "customerName", // Add a name property for identification
+              name: "customerName",
               type: "text",
-              placeholder: "Nombre de la persona",
+              placeholder: "Person's Name",
             },
           ]}
           buttons={[
             {
-              text: "Descartar",
+              text: "Discard",
               role: "cancel",
               handler: () => {
                 console.log("Cancel clicked");
               },
             },
             {
-              text: "Aceptar",
+              text: "Accept",
               handler: (alertData) => {
                 addPerson(alertData.customerName);
               },
@@ -598,55 +495,53 @@ const Customers = () => {
           ]}
         />
 
-        {/* Alert to delete customer */}
         <IonAlert
           isOpen={showDeleteAlert}
           onDidDismiss={() => setShowDeleteAlert(false)}
-          header="Verificar Eliminación"
-          message="¿Estás seguro de que deseas eliminar esta cuenta y todos los recibos asociados con ella?"
+          header="Confirm Deletion"
+          message="Are you sure you want to delete this account and all associated receipts?"
           buttons={[
             {
-              text: "Cancelar",
+              text: "Cancel",
               role: "cancel",
               handler: () => {
-                setShowDeleteAlert(false); // Optionally reset itemToDelete here if not done on dismissal
+                setShowDeleteAlert(false);
               },
             },
             {
-              text: "Sí",
+              text: "Yes",
               handler: () => {
                 if (itemToDelete !== null) {
                   deleteItem(itemToDelete);
-                  setItemToDelete(null); // Reset the itemToDelete after deletion
+                  setItemToDelete(null);
                 }
               },
             },
           ]}
         />
 
-        {/* Alert to edit customer */}
         <IonAlert
           isOpen={showEditCustomerAlert}
           onDidDismiss={() => setShowEditCustomerAlert(false)}
-          header="Editar cliente"
+          header="Edit Customer"
           inputs={[
             {
               name: "customerName",
               type: "text",
               value: currentCustomerName,
-              placeholder: "Nombre del Cliente",
+              placeholder: "Customer Name",
             },
           ]}
           buttons={[
             {
-              text: "Cancelar",
+              text: "Cancel",
               role: "cancel",
               handler: () => {
                 console.log("Edit cancelled");
               },
             },
             {
-              text: "Guardar",
+              text: "Save",
               handler: (alertData) => {
                 updateCustomer(selectedCustomerId, alertData.customerName);
               },
@@ -657,28 +552,27 @@ const Customers = () => {
         <IonAlert
           isOpen={showEditDebtAlert}
           onDidDismiss={() => setShowEditDebtAlert(false)}
-          header={"Registrar Pago"}
+          header={"Register Payment"}
           inputs={[
             {
               name: "paymentAmount",
               type: "number",
-              placeholder: "Cantidad Pagada",
+              placeholder: "Amount Paid",
             },
           ]}
           buttons={[
             {
-              text: "Cancelar",
+              text: "Cancel",
               role: "cancel",
               handler: () => {
-                setNewDebtAmount(""); // You might need to adjust this part based on your state management
+                setNewDebtAmount("");
               },
             },
             {
-              text: "Pagar",
+              text: "Pay",
               handler: (alertData) => {
                 const payment = parseFloat(alertData.paymentAmount);
                 if (!isNaN(payment)) {
-                  // Make sure payment is a number
                   updateReceiptDebt(payment);
                 }
               },
@@ -687,26 +581,26 @@ const Customers = () => {
         />
 
         <IonAlert
-          isOpen={showCreteReceiptAlert}
+          isOpen={showCreateReceiptAlert}
           onDidDismiss={() => setShowCreateReceiptAlert(false)}
-          header={"Agregar Recibo"}
+          header={"Add Receipt"}
           inputs={[
             {
               name: "debtAmount",
               type: "number",
-              placeholder: "Monto de Deuda",
+              placeholder: "Debt Amount",
             },
           ]}
           buttons={[
             {
-              text: "Cancelar",
+              text: "Cancel",
               role: "cancel",
               handler: () => {
                 setTempTotalPrice(0);
               },
             },
             {
-              text: "Agregar",
+              text: "Add",
               handler: (alertData) => {
                 const price = parseFloat(alertData.debtAmount);
                 createReceipt(activeCustomerId, price);
@@ -715,14 +609,12 @@ const Customers = () => {
           ]}
         />
 
-        {/* Toast for successful debt update */}
         <IonToast
           isOpen={showDebtUpdatedAlert}
           onDidDismiss={() => setShowDebtUpdatedAlert(false)}
-          message="Transacción Registrada!"
+          message="Transaction Registered!"
           position="top"
-          duration={2000} // Toast will dismiss after 2000ms
-          // cssClass="payment-confirmation-toast"
+          duration={2000}
         />
       </IonContent>
     </IonPage>
