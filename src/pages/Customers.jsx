@@ -69,23 +69,35 @@ const Customers = () => {
   }, []);
 
   const loadCustomers = () => {
-    setCustomers(exampleCustomers);
-    const total = exampleCustomers.reduce(
+    const storedCustomers = JSON.parse(localStorage.getItem("customers")) || exampleCustomers;
+    setCustomers(storedCustomers);
+    const total = storedCustomers.reduce(
       (acc, customer) => acc + parseFloat(customer.customer_totaldebt || 0),
       0
     );
     setTotalDebt(total);
   };
 
+  const saveCustomers = (data) => {
+    localStorage.setItem("customers", JSON.stringify(data));
+    setCustomers(data);
+  };
+
+  const saveReceipts = (data) => {
+    localStorage.setItem("receipts", JSON.stringify(data));
+    setReceipts(data);
+  };
+
   const fetchCustomerDetails = (id) => {
-    const customerData = exampleCustomers.find((customer) => customer.id === id);
+    const customerData = customers.find((customer) => customer.id === id);
     setCustomerDetails(customerData);
     fetchReceipts(id);
     setShowModal(true);
   };
 
   const fetchReceipts = (customerId) => {
-    const customerReceipts = exampleReceipts.filter(
+    const storedReceipts = JSON.parse(localStorage.getItem("receipts")) || exampleReceipts;
+    const customerReceipts = storedReceipts.filter(
       (receipt) => receipt.customer_id === customerId
     );
 
@@ -129,7 +141,7 @@ const Customers = () => {
       dateLastPayment: new Date().toISOString(),
     };
 
-    setReceipts(updatedReceipts);
+    saveReceipts(updatedReceipts);
     setShowDebtUpdatedAlert(true);
     fetchCustomerDetails(customerDetails.id);
     setShowEditDebtAlert(false);
@@ -147,13 +159,14 @@ const Customers = () => {
       isPaid: false,
     };
 
-    setReceipts([...receipts, newReceipt]);
+    const updatedReceipts = [...receipts, newReceipt];
+    saveReceipts(updatedReceipts);
     fetchCustomerDetails(customerDetails.id);
     setShowCreateReceiptAlert(false);
   };
 
   const searchCustomers = () => {
-    let filteredCustomers = exampleCustomers;
+    let filteredCustomers = customers;
     if (searchTerm) {
       filteredCustomers = filteredCustomers.filter((customer) =>
         customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -179,7 +192,7 @@ const Customers = () => {
       customer_doesowe: false,
     };
 
-    setCustomers([...customers, newCustomer]);
+    saveCustomers([...customers, newCustomer]);
   };
 
   const handleInput = (value) => {
@@ -199,8 +212,8 @@ const Customers = () => {
       (receipt) => receipt.customer_id !== itemId
     );
 
-    setCustomers(updatedCustomers);
-    setReceipts(updatedReceipts);
+    saveCustomers(updatedCustomers);
+    saveReceipts(updatedReceipts);
   };
 
   const updateCustomer = (customerId, customerName) => {
@@ -209,7 +222,7 @@ const Customers = () => {
         ? { ...customer, customer_name: customerName }
         : customer
     );
-    setCustomers(updatedCustomers);
+    saveCustomers(updatedCustomers);
   };
 
   return (

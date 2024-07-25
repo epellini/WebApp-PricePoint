@@ -99,13 +99,19 @@ const Products = () => {
   }, [searchCustomerTerm]);
 
   const loadData = () => {
-    let filteredItems = exampleProducts;
+    const storedItems = JSON.parse(localStorage.getItem("products")) || exampleProducts;
+    let filteredItems = storedItems;
     if (searchTerm) {
       filteredItems = filteredItems.filter(product =>
         product.product_name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     setItems(filteredItems.sort((a, b) => a.product_name.localeCompare(b.product_name)));
+  };
+
+  const saveData = (data) => {
+    localStorage.setItem("products", JSON.stringify(data));
+    setItems(data);
   };
 
   const addToBasket = (price) => {
@@ -124,7 +130,7 @@ const Products = () => {
     const updatedItems = items.map(item =>
       item.id === itemId ? { ...item, product_price: parseFloat(newPrice), product_updateDate: new Date().toISOString() } : item
     );
-    setItems(updatedItems);
+    saveData(updatedItems);
   };
 
   const addItem = (productName, productPrice) => {
@@ -134,12 +140,12 @@ const Products = () => {
       product_price: parseFloat(productPrice),
       product_updateDate: new Date().toISOString(),
     };
-    
-    setItems([...items, newItem]);
+    saveData([...items, newItem]);
   };
 
   const handleRefresh = (event) => {
     setTimeout(() => {
+      loadData();
       event.detail.complete();
     }, 2000);
   };
@@ -150,7 +156,8 @@ const Products = () => {
   };
 
   const deleteItem = (itemId) => {
-    setItems(items.filter(item => item.id !== itemId));
+    const updatedItems = items.filter(item => item.id !== itemId);
+    saveData(updatedItems);
   };
 
   const calculatePriceStatusColorClass = (product) => {
