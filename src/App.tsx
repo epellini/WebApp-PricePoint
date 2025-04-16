@@ -38,17 +38,29 @@ import "./theme/variables.css";
 setupIonicReact();
 const App: React.FC = () => (
   <IonApp>
-    <Analytics/>
+    {/* Demo banner */}
+    <div
+      style={{
+        backgroundColor: '#f24c3d',
+        color: 'white',
+        textAlign: 'center',
+        padding: '8px',
+        fontWeight: 'bold',
+        zIndex: 9999,
+      }}
+    >
+      This is a demo version of the app. Some features might not be available.
+    </div>
+
+    <Analytics />
+
     <IonReactRouter>
       <IonTabs>
         <IonRouterOutlet>
           <Route path="/Products" component={Products} />
-
           <Route path="/Customers" component={Customers} />
           {/* <Route path="/Customers/:id" component={CustomerDetails} /> */}
-
           <Route exact path="/" render={() => <Redirect to="/Products" />} />
-
           <Route render={() => <Redirect to={"/Products"} />} />
         </IonRouterOutlet>
 
@@ -65,5 +77,6 @@ const App: React.FC = () => (
     </IonReactRouter>
   </IonApp>
 );
+
 
 export default App;
