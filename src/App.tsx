@@ -54,7 +54,7 @@ const App: React.FC = () => (
 
     <Analytics />
 
-    <IonReactRouter>
+    <IonReactRouter> 
       <IonTabs>
         <IonRouterOutlet>
           <Route path="/Products" component={Products} />
